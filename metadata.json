@@ -1,0 +1,6 @@
+{
+  "name": "MOMENTUM",
+  "description": "Performance & Recognition Platform for teams with role-based performance operations, customizable metrics, multi-directional appreciation, and rollup reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
