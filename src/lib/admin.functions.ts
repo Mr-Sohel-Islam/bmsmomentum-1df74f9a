@@ -144,10 +144,25 @@ export const deleteMetric = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export interface AdminUser {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  avatar_url?: string | null;
+  department?: string | null;
+  position_id?: string | null;
+  manager_id?: string | null;
+  is_active: boolean;
+  created_at: string;
+  roles: string[];
+  permissions: string[];
+  is_super_admin: boolean;
+}
+
 // ---------- Users + Roles + Permissions ----------
 export const listUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .handler(async (): Promise<AdminUser[]> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // 1. Fetch profiles safely using supabaseAdmin
@@ -251,11 +266,18 @@ export const listUsers = createServerFn({ method: "GET" })
       }
     }
 
-    return Array.from(profileMap.values()).map((p) => {
+    return Array.from(profileMap.values()).map((p): AdminUser => {
       const id = p.id as string;
       const email = emailByUser.get(id) ?? null;
       return {
-        ...p,
+        id,
+        full_name: (p.full_name as string | null) ?? null,
+        avatar_url: (p.avatar_url as string | null) ?? null,
+        department: (p.department as string | null) ?? null,
+        position_id: (p.position_id as string | null) ?? null,
+        manager_id: (p.manager_id as string | null) ?? null,
+        is_active: Boolean(p.is_active ?? true),
+        created_at: (p.created_at as string) || new Date().toISOString(),
         email,
         roles: rolesByUser.get(id) ?? [],
         permissions: permsByUser.get(id) ?? [],

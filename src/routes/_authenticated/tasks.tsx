@@ -71,7 +71,8 @@ import { useMyAccess } from "@/hooks/use-my-access";
 type UserOption = {
   id: string;
   full_name: string | null;
-  email: string | null;
+  email?: string | null;
+  is_active?: boolean;
 };
 
 export const Route = createFileRoute("/_authenticated/tasks")({
@@ -192,7 +193,7 @@ function TasksPage() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ["tasks"] });
 
   const createMut = useMutation({
-    mutationFn: (v: Parameters<typeof create>[0]["data"]) => create({ data: v }),
+    mutationFn: (v: any) => create({ data: v }),
     onSuccess: () => {
       toast.success("Task created");
       setTaskDialogOpen(false);
@@ -202,7 +203,7 @@ function TasksPage() {
   });
 
   const updateMut = useMutation({
-    mutationFn: (v: Parameters<typeof update>[0]["data"]) => update({ data: v }),
+    mutationFn: (v: any) => update({ data: v }),
     onSuccess: () => invalidate(),
     onError: (e: { message?: string }) => toast.error(e?.message ?? "Failed to update task"),
   });
@@ -647,7 +648,9 @@ function TasksPage() {
               id: activeTaskDetail.id,
               status: newStatus as "todo" | "in_progress" | "review" | "done",
             });
-            setActiveTaskDetail((prev) => (prev ? { ...prev, status: newStatus } : null));
+            setActiveTaskDetail((prev) =>
+              prev ? { ...prev, status: newStatus as TaskStatus } : null,
+            );
           }}
           users={users}
           teams={teams}

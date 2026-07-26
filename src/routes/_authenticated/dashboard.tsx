@@ -16,17 +16,17 @@ function Dashboard() {
 
   const { data: tasks = [] } = useQuery({
     queryKey: ["tasks"],
-    queryFn: () => getTasks({ data: {} }),
+    queryFn: () => getTasks(),
   });
 
   const { data: sprints = [] } = useQuery({
     queryKey: ["sprints"],
-    queryFn: () => getSprints({ data: {} }),
+    queryFn: () => getSprints(),
   });
 
   const { data: stories = [] } = useQuery({
     queryKey: ["stories"],
-    queryFn: () => getStories({ data: {} }),
+    queryFn: () => getStories(),
   });
 
   const activeTasksCount = tasks.filter((t) => t.status !== "done").length;

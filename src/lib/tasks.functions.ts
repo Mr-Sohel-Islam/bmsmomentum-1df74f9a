@@ -7,17 +7,39 @@ export const TASK_STATUSES = ["todo", "in_progress", "blocked", "done"] as const
 export const TASK_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
+export interface Task {
+  id: string;
+  title: string;
+  description?: string | null;
+  assignee_id?: string | null;
+  assigner_id?: string | null;
+  team_id?: string | null;
+  epic_id?: string | null;
+  sprint_id?: string | null;
+  story_id?: string | null;
+  status: TaskStatus;
+  priority: "low" | "medium" | "high" | "urgent";
+  points: number;
+  due_date?: string | null;
+  completed_at?: string | null;
+  approval_status?: string | null;
+  created_at: string;
+  updated_at?: string;
+  assignee_name?: string | null;
+  assigner_name?: string | null;
+}
+
 const TASK_COLUMNS =
   "id, title, description, assignee_id, assigner_id, status, priority, points, due_date, completed_at, approval_status, created_at, updated_at";
 
-async function withNames(supabase: SupabaseClient, rows: Record<string, unknown>[]) {
+async function withNames(supabase: SupabaseClient, rows: Record<string, unknown>[]): Promise<Task[]> {
   const ids = Array.from(
     new Set(
       rows.flatMap((t) => [t.assignee_id as string, t.assigner_id as string]).filter(Boolean),
     ),
   );
   if (ids.length === 0)
-    return rows.map((t) => ({ ...t, assignee_name: null, assigner_name: null }));
+    return rows.map((t) => ({ ...t, assignee_name: null, assigner_name: null })) as unknown as Task[];
   const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", ids);
   const map = new Map(
     (profiles ?? []).map((p: Record<string, unknown>) => [p.id as string, p.full_name as string]),
@@ -26,18 +48,18 @@ async function withNames(supabase: SupabaseClient, rows: Record<string, unknown>
     ...t,
     assignee_name: map.get(t.assignee_id as string) ?? null,
     assigner_name: map.get(t.assigner_id as string) ?? null,
-  }));
+  })) as unknown as Task[];
 }
 
 export const listTasks = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async ({ context }): Promise<Task[]> => {
     const { data, error } = await context.supabase
       .from("tasks")
       .select("*")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return withNames(context.supabase, data ?? []);
+    return withNames(context.supabase, (data ?? []) as Record<string, unknown>[]);
   });
 
 export const listAssignableUsers = createServerFn({ method: "GET" })
@@ -49,7 +71,12 @@ export const listAssignableUsers = createServerFn({ method: "GET" })
       .eq("is_active", true)
       .order("full_name");
     if (error) throw new Error(error.message);
-    return data ?? [];
+    return ((data ?? []) as any[]).map((p) => ({ ...p, email: null })) as {
+      id: string;
+      full_name: string | null;
+      email: string | null;
+      is_active: boolean;
+    }[];
   });
 
 const taskInput = z.object({
@@ -138,7 +165,7 @@ export const updateTask = createServerFn({ method: "POST" })
 
     const { data: row, error } = await context.supabase
       .from("tasks")
-      .update(basePatch)
+      .update(basePatch as any)
       .eq("id", id)
       .select(TASK_COLUMNS)
       .single();
@@ -173,7 +200,7 @@ export const bulkAssignTasks = createServerFn({ method: "POST" })
     if ("team_id" in data) patch.team_id = data.team_id;
 
     try {
-      const { error } = await context.supabase.from("tasks").update(patch).in("id", data.ids);
+      const { error } = await context.supabase.from("tasks").update(patch as any).in("id", data.ids);
       if (!error) return { count: data.ids.length };
     } catch {
       // fallback
@@ -182,7 +209,7 @@ export const bulkAssignTasks = createServerFn({ method: "POST" })
     // Fallback base patch
     const basePatch: Record<string, unknown> = {};
     if ("assignee_id" in data) basePatch.assignee_id = data.assignee_id;
-    const { error } = await context.supabase.from("tasks").update(basePatch).in("id", data.ids);
+    const { error } = await context.supabase.from("tasks").update(basePatch as any).in("id", data.ids);
     if (error) throw new Error(error.message);
     return { count: data.ids.length };
   });

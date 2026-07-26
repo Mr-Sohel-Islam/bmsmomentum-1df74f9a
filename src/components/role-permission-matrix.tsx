@@ -47,7 +47,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { generateAuditPdfReport, type Team } from "@/lib/audit-pdf-generator";
+import { generateAuditPdfReport } from "@/lib/audit-pdf-generator";
+import type { Team } from "@/lib/teams.functions";
 
 export type CRUD = "create" | "read" | "update" | "delete";
 

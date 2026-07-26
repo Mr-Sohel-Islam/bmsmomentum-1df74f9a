@@ -49,25 +49,25 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   // Queries for real-time search across hierarchy
   const { data: tasks = [] } = useQuery({
     queryKey: ["tasks"],
-    queryFn: () => getTasks({ data: {} }),
+    queryFn: () => getTasks(),
     enabled: open,
   });
 
   const { data: epics = [] } = useQuery({
     queryKey: ["epics"],
-    queryFn: () => getEpics({ data: {} }),
+    queryFn: () => getEpics(),
     enabled: open,
   });
 
   const { data: teams = [] } = useQuery({
     queryKey: ["teams"],
-    queryFn: () => getTeams({ data: undefined }),
+    queryFn: () => getTeams(),
     enabled: open,
   });
 
   const { data: users = [] } = useQuery({
     queryKey: ["assignable_users"],
-    queryFn: () => getUsers({ data: {} }),
+    queryFn: () => getUsers(),
     enabled: open,
   });
 
@@ -180,7 +180,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             {epics.slice(0, 6).map((e) => (
               <CommandItem
                 key={e.id}
-                value={`epic ${e.title} ${e.status} ${e.priority}`}
+                value={`epic ${e.title} ${e.status}`}
                 onSelect={() => handleSelect(() => navigate({ to: "/tasks" }))}
                 className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer"
               >

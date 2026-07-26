@@ -13,7 +13,7 @@ export interface TeamMember {
   team_id: string;
   user_id: string;
   role: string;
-  user_name?: string;
+  user_name?: string | null;
 }
 
 export interface Team {
@@ -182,10 +182,10 @@ export function generateAuditPdfReport(options: GeneratePdfOptions) {
     },
   });
 
-  interface DocWithAutoTable extends jsPDF {
+  type DocWithAutoTable = jsPDF & {
     lastAutoTable: { finalY: number };
     internal: { getNumberOfPages: () => number };
-  }
+  };
 
   currentY = (doc as unknown as DocWithAutoTable).lastAutoTable.finalY + 10;
 

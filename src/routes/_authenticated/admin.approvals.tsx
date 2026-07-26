@@ -128,7 +128,10 @@ function AdminApprovalsPage() {
         onSubmit={(e) => {
           e.preventDefault();
           if (!name.trim()) return;
-          createMut.mutate({ name, entity_type: entity, active: true });
+          createMut.mutate({
+            name,
+            entity_type: entity as (typeof ENTITY_TYPES)[number],
+          });
           setName("");
         }}
       >

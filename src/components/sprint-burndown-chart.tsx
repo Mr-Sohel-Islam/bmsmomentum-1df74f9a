@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Task, Sprint, Story } from "@/types";
+import type { Task, Sprint, Story } from "@/lib/tasks.functions";
 
 interface SprintBurndownChartProps {
   sprints: Sprint[];
