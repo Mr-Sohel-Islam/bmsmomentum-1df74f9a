@@ -1,0 +1,22 @@
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+
+const SUPABASE_URL =
+  (typeof process !== "undefined" && process.env?.SUPABASE_URL) ||
+  (typeof process !== "undefined" && process.env?.VITE_SUPABASE_URL) ||
+  import.meta.env.VITE_SUPABASE_URL ||
+  "";
+
+const SUPABASE_PUBLISHABLE_KEY =
+  (typeof process !== "undefined" && process.env?.SUPABASE_PUBLISHABLE_KEY) ||
+  (typeof process !== "undefined" && process.env?.VITE_SUPABASE_PUBLISHABLE_KEY) ||
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  "";
+
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    storage: typeof window !== "undefined" ? localStorage : undefined,
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
