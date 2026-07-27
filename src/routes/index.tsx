@@ -1,5 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { supabase } from "@/integrations/supabase/client";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Activity,
   BarChart3,
@@ -13,10 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) throw redirect({ to: "/dashboard" });
-  },
   head: () => ({
     meta: [
       { title: "MOMENTUM — Performance & Recognition Platform" },
@@ -42,12 +37,12 @@ function Landing() {
       {/* Nav */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-          <a href="/" className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-md bg-primary text-primary-foreground">
               <Activity className="h-4 w-4" strokeWidth={2.75} />
             </div>
             <span className="font-display text-lg font-bold tracking-tight">MOMENTUM</span>
-          </a>
+          </Link>
           <nav className="hidden items-center gap-8 md:flex">
             <a
               href="#features"

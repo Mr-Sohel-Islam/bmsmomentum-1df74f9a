@@ -18,65 +18,29 @@ export const ROLES = ["super_admin", "admin", "manager", "member"] as const;
 export type Role = (typeof ROLES)[number];
 
 async function assertAdmin(context: { supabase: SupabaseClient; userId: string }) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    try {
-      const { data: userData } = await supabaseAdmin.auth.admin.getUserById(context.userId);
-      if (userData?.user?.email === "soheljavadeveloper@gmail.com") {
-        return ["super_admin", "admin"];
-      }
-    } catch {
-      /* ignore auth.admin failure if service role key is absent/invalid */
-    }
-  }
-
-  const { data } = await supabaseAdmin
+  const { data, error } = await context.supabase
     .from("user_roles")
     .select("role")
     .eq("user_id", context.userId);
+  if (error) throw new Error(error.message);
   const roles = (data ?? []).map((r: { role: string }) => r.role);
-  if (roles.includes("admin") || roles.includes("super_admin")) {
-    return roles;
+  if (!roles.includes("admin") && !roles.includes("super_admin")) {
+    throw new Error("Admin access required");
   }
-
-  // If there are no user roles configured at all yet, grant admin
-  const { count } = await supabaseAdmin
-    .from("user_roles")
-    .select("*", { count: "exact", head: true });
-  if (count === 0) {
-    return ["super_admin", "admin"];
-  }
-
-  throw new Error("Admin access required");
+  return roles;
 }
 
 async function assertPermission(
   context: { supabase: SupabaseClient; userId: string },
   permission: Permission,
 ) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    try {
-      const { data: userData } = await supabaseAdmin.auth.admin.getUserById(context.userId);
-      if (userData?.user?.email === "soheljavadeveloper@gmail.com") return;
-    } catch {
-      /* ignore auth.admin failure if service role key is absent/invalid */
-    }
-  }
-
-  const { data: roles } = await supabaseAdmin
+  const { data: roles } = await context.supabase
     .from("user_roles")
     .select("role")
     .eq("user_id", context.userId);
   const roleList = (roles ?? []).map((r: { role: string }) => r.role);
   if (roleList.includes("admin") || roleList.includes("super_admin")) return;
-
-  const { count } = await supabaseAdmin
-    .from("user_roles")
-    .select("*", { count: "exact", head: true });
-  if (count === 0) return;
-
-  const { data: perms } = await supabaseAdmin
+  const { data: perms } = await context.supabase
     .from("user_permissions")
     .select("permission")
     .eq("user_id", context.userId)
@@ -144,180 +108,85 @@ export const deleteMetric = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export interface AdminUser {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  avatar_url?: string | null;
-  department?: string | null;
-  position_id?: string | null;
-  manager_id?: string | null;
-  is_active: boolean;
-  created_at: string;
-  roles: string[];
-  permissions: string[];
-  is_super_admin: boolean;
-}
-
 // ---------- Users + Roles + Permissions ----------
 export const listUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<AdminUser[]> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    // 1. Fetch profiles safely using supabaseAdmin
-    let profiles: Record<string, unknown>[] = [];
-    try {
-      const { data, error: pErr } = await supabaseAdmin
-        .from("profiles")
-        .select(
-          "id, full_name, avatar_url, department, position_id, manager_id, is_active, created_at",
-        )
-        .order("created_at", { ascending: false });
-      if (pErr) console.error("[listUsers] Error fetching profiles:", pErr);
-      if (data) profiles = data as Record<string, unknown>[];
-    } catch (e) {
-      console.error("[listUsers] Exception fetching profiles:", e);
-    }
-
-    // 2. Fetch auth users via admin API safely if service role key is present
-    let authUsers: {
-      id: string;
-      email?: string;
-      user_metadata?: Record<string, unknown>;
-      created_at?: string;
-    }[] = [];
-    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      try {
-        const { data: authList } = await supabaseAdmin.auth.admin.listUsers({
-          page: 1,
-          perPage: 1000,
-        });
-        if (authList?.users) authUsers = authList.users;
-      } catch {
-        /* Ignore auth.admin failure if service role key is missing/invalid */
-      }
-    }
-
-    const emailByUser = new Map<string, string>();
-    for (const u of authUsers) {
-      if (u.email) emailByUser.set(u.id, u.email);
-    }
-
-    // 3. Fetch roles and permissions safely
-    let roles: { user_id: string; role: string }[] = [];
-    try {
-      const { data: rData } = await supabaseAdmin.from("user_roles").select("user_id, role");
-      if (rData) roles = rData as { user_id: string; role: string }[];
-    } catch (e) {
-      console.error("[listUsers] Exception fetching user_roles:", e);
-    }
-
-    let perms: { user_id: string; permission: string }[] = [];
-    try {
-      const { data: pData } = await supabaseAdmin
-        .from("user_permissions")
-        .select("user_id, permission");
-      if (pData) perms = pData as { user_id: string; permission: string }[];
-    } catch (e) {
-      console.error("[listUsers] Exception fetching user_permissions:", e);
-    }
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { data: profiles, error } = await context.supabase
+      .from("profiles")
+      .select(
+        "id, full_name, avatar_url, department, position_id, manager_id, is_active, created_at",
+      )
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    const { data: roles } = await context.supabase.from("user_roles").select("user_id, role");
+    const { data: perms } = await context.supabase
+      .from("user_permissions")
+      .select("user_id, permission");
 
     const rolesByUser = new Map<string, string[]>();
-    for (const r of roles) {
+    for (const r of roles ?? []) {
       const arr = rolesByUser.get(r.user_id) ?? [];
       arr.push(r.role);
       rolesByUser.set(r.user_id, arr);
     }
-
     const permsByUser = new Map<string, string[]>();
-    for (const p of perms) {
+    for (const p of perms ?? []) {
       const arr = permsByUser.get(p.user_id) ?? [];
       arr.push(p.permission);
       permsByUser.set(p.user_id, arr);
     }
 
-    let reservedEmails = new Set<string>();
-    try {
-      const { data: reserved } = await supabaseAdmin.from("reserved_super_admins").select("email");
-      if (reserved) reservedEmails = new Set(reserved.map((r: { email: string }) => r.email));
-    } catch {
-      // Ignore if table missing
-    }
+    // Fetch emails via admin API
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: authList } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+    const emailByUser = new Map<string, string>();
+    for (const u of authList?.users ?? []) if (u.email) emailByUser.set(u.id, u.email);
 
-    const profileMap = new Map<string, Record<string, unknown>>();
-    for (const p of profiles) {
-      if (p.id) profileMap.set(p.id as string, p);
-    }
+    const { data: reserved } = await context.supabase.from("reserved_super_admins").select("email");
+    const reservedEmails = new Set((reserved ?? []).map((r: { email: string }) => r.email));
 
-    // Combine with authUsers so any user created in Auth appears even if profile record missing
-    for (const u of authUsers) {
-      if (!profileMap.has(u.id)) {
-        profileMap.set(u.id, {
-          id: u.id,
-          full_name: u.user_metadata?.full_name || u.email?.split("@")[0] || "User",
-          avatar_url: u.user_metadata?.avatar_url || null,
-          department: null,
-          position_id: null,
-          manager_id: null,
-          is_active: true,
-          created_at: u.created_at || new Date().toISOString(),
-        });
-      }
-    }
-
-    return Array.from(profileMap.values()).map((p): AdminUser => {
-      const id = p.id as string;
-      const email = emailByUser.get(id) ?? null;
+    return (profiles ?? []).map((p) => {
+      const email = emailByUser.get(p.id) ?? null;
       return {
-        id,
-        full_name: (p.full_name as string | null) ?? null,
-        avatar_url: (p.avatar_url as string | null) ?? null,
-        department: (p.department as string | null) ?? null,
-        position_id: (p.position_id as string | null) ?? null,
-        manager_id: (p.manager_id as string | null) ?? null,
-        is_active: Boolean(p.is_active ?? true),
-        created_at: (p.created_at as string) || new Date().toISOString(),
+        id: p.id as string,
+        full_name: (p.full_name ?? null) as string | null,
+        avatar_url: (p.avatar_url ?? null) as string | null,
+        department: (p.department ?? null) as string | null,
+        position_id: (p.position_id ?? null) as string | null,
+        manager_id: (p.manager_id ?? null) as string | null,
+        is_active: Boolean(p.is_active),
+        created_at: p.created_at as string,
         email,
-        roles: rolesByUser.get(id) ?? [],
-        permissions: permsByUser.get(id) ?? [],
-        is_super_admin: email
-          ? reservedEmails.has(email) || email === "soheljavadeveloper@gmail.com"
-          : false,
+        roles: rolesByUser.get(p.id) ?? [],
+        permissions: permsByUser.get(p.id) ?? [],
+        is_super_admin: email ? reservedEmails.has(email) : false,
       };
     });
+
   });
 
 export const getMyProfile = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: profile } = await supabaseAdmin
+    const { data: profile } = await context.supabase
       .from("profiles")
       .select("*")
       .eq("id", context.userId)
       .single();
-    const { data: roles } = await supabaseAdmin
+    const { data: roles } = await context.supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", context.userId);
-    const { data: perms } = await supabaseAdmin
+    const { data: perms } = await context.supabase
       .from("user_permissions")
       .select("permission")
       .eq("user_id", context.userId);
-
-    const isSohel = context.user?.email === "soheljavadeveloper@gmail.com";
-    const userRoles = Array.from(
-      new Set([
-        ...(isSohel ? ["super_admin", "admin"] : []),
-        ...(roles ?? []).map((r: { role: string }) => r.role),
-      ]),
-    );
-
     return {
       userId: context.userId,
       profile,
-      roles: userRoles,
+      roles: (roles ?? []).map((r: { role: string }) => r.role),
       permissions: (perms ?? []).map((p: { permission: string }) => p.permission),
     };
   });
@@ -351,21 +220,16 @@ export const createUser = createServerFn({ method: "POST" })
     if (cerr || !created.user) throw new Error(cerr?.message ?? "Failed to create user");
     const uid = created.user.id;
 
-    // Guarantee profile upsert
-    try {
-      await supabaseAdmin.from("profiles").upsert(
-        {
-          id: uid,
-          full_name: data.full_name,
-          department: data.department ?? null,
-          position_id: data.position_id ?? null,
-          manager_id: data.manager_id ?? null,
-        },
-        { onConflict: "id" },
-      );
-    } catch (e) {
-      console.error("Profile upsert warning:", e);
-    }
+    // Trigger creates profile — patch with extras
+    await supabaseAdmin
+      .from("profiles")
+      .update({
+        full_name: data.full_name,
+        department: data.department ?? null,
+        position_id: data.position_id ?? null,
+        manager_id: data.manager_id ?? null,
+      })
+      .eq("id", uid);
 
     // Filter out super_admin — not grantable
     const roles = data.roles.filter((r) => r !== "super_admin");

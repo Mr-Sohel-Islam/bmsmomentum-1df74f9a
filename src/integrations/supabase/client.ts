@@ -46,7 +46,7 @@ function createSupabaseClient() {
     throw new Error(message);
   }
 
-  const client = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     global: {
       fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
     },
@@ -56,41 +56,6 @@ function createSupabaseClient() {
       autoRefreshToken: true,
     },
   });
-
-  if (typeof window !== "undefined") {
-    const syncCookie = (session: { access_token?: string } | null) => {
-      if (session?.access_token) {
-        document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=604800; SameSite=Lax`;
-      } else {
-        document.cookie = `sb-access-token=; path=/; max-age=0; SameSite=Lax`;
-      }
-    };
-
-    // Synchronous attempt from localStorage to avoid delay on first load
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.includes("auth-token") || key.startsWith("sb-"))) {
-          const val = localStorage.getItem(key);
-          if (val) {
-            const parsed = JSON.parse(val);
-            const token = parsed?.access_token || (Array.isArray(parsed) ? parsed[0] : null);
-            if (token && typeof token === "string") {
-              document.cookie = `sb-access-token=${token}; path=/; max-age=604800; SameSite=Lax`;
-              break;
-            }
-          }
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-
-    client.auth.getSession().then(({ data }) => syncCookie(data.session));
-    client.auth.onAuthStateChange((_event, session) => syncCookie(session));
-  }
-
-  return client;
 }
 
 let _supabase: ReturnType<typeof createSupabaseClient> | undefined;

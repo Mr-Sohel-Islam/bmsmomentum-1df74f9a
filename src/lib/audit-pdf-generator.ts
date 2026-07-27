@@ -4,7 +4,7 @@ import autoTable from "jspdf-autotable";
 export interface UserOption {
   id: string;
   full_name: string | null;
-  email: string | null;
+  email?: string | null;
   roles?: string[];
 }
 
@@ -182,7 +182,7 @@ export function generateAuditPdfReport(options: GeneratePdfOptions) {
     },
   });
 
-  type DocWithAutoTable = jsPDF & {
+  type DocWithAutoTable = {
     lastAutoTable: { finalY: number };
     internal: { getNumberOfPages: () => number };
   };

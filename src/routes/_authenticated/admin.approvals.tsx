@@ -130,7 +130,7 @@ function AdminApprovalsPage() {
           if (!name.trim()) return;
           createMut.mutate({
             name,
-            entity_type: entity as (typeof ENTITY_TYPES)[number],
+            entity_type: entity as "task" | "score" | "report" | "appreciation",
           });
           setName("");
         }}

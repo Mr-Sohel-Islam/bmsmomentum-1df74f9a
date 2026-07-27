@@ -70,7 +70,7 @@ type Position = { id: string; title: string; level: number };
 function UsersPage() {
   const list = useServerFn(listUsers);
   const listPos = useServerFn(listPositions);
-  const { data, isLoading, error } = useQuery({ queryKey: ["users"], queryFn: () => list() });
+  const { data, isLoading } = useQuery({ queryKey: ["users"], queryFn: () => list() });
   const { data: positions } = useQuery({ queryKey: ["positions"], queryFn: () => listPos() });
 
   return (
@@ -90,21 +90,14 @@ function UsersPage() {
 
       <div className="rounded-lg border border-border bg-card">
         {isLoading && <div className="p-8 text-center text-sm text-muted-foreground">Loading…</div>}
-        {error && (
-          <div className="p-8 text-center text-sm text-destructive">
-            Failed to load users: {(error as Error).message}
-          </div>
-        )}
-        {!isLoading &&
-          !error &&
-          (data as UserRow[] | undefined)?.map((u) => (
-            <UserRowItem
-              key={u.id}
-              user={u}
-              positions={(positions as Position[] | undefined) ?? []}
-            />
-          ))}
-        {!isLoading && !error && (!data || (data as UserRow[]).length === 0) && (
+        {(data as UserRow[] | undefined)?.map((u) => (
+          <UserRowItem
+            key={u.id}
+            user={u}
+            positions={(positions as Position[] | undefined) ?? []}
+          />
+        ))}
+        {!isLoading && (!data || (data as UserRow[]).length === 0) && (
           <div className="p-10 text-center text-sm text-muted-foreground">No users yet.</div>
         )}
       </div>

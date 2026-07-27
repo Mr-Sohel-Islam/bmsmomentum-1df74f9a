@@ -33,6 +33,26 @@ function Dashboard() {
   const completedTasksCount = tasks.filter((t) => t.status === "done").length;
   const activeSprint = sprints.find((s) => s.status === "active") || sprints[0];
 
+  const sprintTasks = activeSprint ? tasks.filter((t) => t.sprint_id === activeSprint.id) : [];
+  const sprintPoints = sprintTasks.reduce((sum, t) => sum + (t.points || 0), 0);
+  const sprintDonePoints = sprintTasks
+    .filter((t) => t.status === "done")
+    .reduce((sum, t) => sum + (t.points || 0), 0);
+  const completionPct = sprintPoints > 0 ? Math.round((sprintDonePoints / sprintPoints) * 100) : 0;
+
+  const daysRemaining = activeSprint?.end_date
+    ? Math.max(
+        0,
+        Math.ceil((new Date(activeSprint.end_date).getTime() - Date.now()) / 86_400_000),
+      )
+    : null;
+
+  const since = Date.now() - 28 * 86_400_000;
+  const recentDonePoints = tasks
+    .filter((t) => t.status === "done" && t.completed_at && new Date(t.completed_at).getTime() >= since)
+    .reduce((sum, t) => sum + (t.points || 0), 0);
+  const velocity = Math.round((recentDonePoints / 4) * 10) / 10;
+
   return (
     <div className="mx-auto max-w-7xl space-y-8 p-6 md:p-10">
       <div>
@@ -47,8 +67,12 @@ function Dashboard() {
         <Stat
           icon={Zap}
           label="Active Sprint"
-          value={activeSprint?.name || "Sprint 24.1"}
-          hint="14 days remaining"
+          value={activeSprint?.name || "No sprint"}
+          hint={
+            daysRemaining === null
+              ? "No end date set"
+              : `${daysRemaining} day${daysRemaining === 1 ? "" : "s"} remaining`
+          }
         />
         <Stat
           icon={CheckSquare}
@@ -56,9 +80,20 @@ function Dashboard() {
           value={String(activeTasksCount)}
           hint={`${completedTasksCount} tasks completed`}
         />
-        <Stat icon={TrendingUp} label="Sprint Completion" value="68%" hint="On track for target" />
-        <Stat icon={Activity} label="Velocity Rate" value="18 pts/wk" hint="+12% vs last sprint" />
+        <Stat
+          icon={TrendingUp}
+          label="Sprint Completion"
+          value={`${completionPct}%`}
+          hint={`${sprintDonePoints} of ${sprintPoints} points done`}
+        />
+        <Stat
+          icon={Activity}
+          label="Velocity Rate"
+          value={`${velocity} pts/wk`}
+          hint="Trailing 4-week average"
+        />
       </div>
+
 
       {/* Main Recharts Sprint Burn-down & Velocity Analytics Component */}
       <div className="pt-2">

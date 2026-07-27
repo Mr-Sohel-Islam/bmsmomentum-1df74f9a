@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Users,
   Plus,
@@ -285,6 +285,7 @@ function TeamsManagementSection({
         name: newTeamName,
         description: newTeamDesc || null,
         lead_id: newTeamLead || null,
+        lead_name: null,
         created_at: new Date().toISOString(),
         members: newTeamLead
           ? [
