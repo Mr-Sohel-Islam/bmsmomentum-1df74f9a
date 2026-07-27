@@ -52,6 +52,31 @@ const taskInput = z.object({
   due_date: z.string().optional().nullable(),
 });
 
+export type TaskInput = z.input<typeof taskInput>;
+export type TaskUpdateInput = Partial<TaskInput> & { id: string };
+export type EpicInput = {
+  title: string;
+  description?: string | null;
+  status?: "planning" | "in_progress" | "completed";
+  color?: string;
+};
+export type SprintInput = {
+  name: string;
+  goal?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  status?: "planning" | "active" | "completed";
+};
+export type StoryInput = {
+  title: string;
+  description?: string | null;
+  epic_id?: string | null;
+  sprint_id?: string | null;
+  points?: number;
+  status?: "backlog" | "in_progress" | "review" | "done";
+};
+
+
 export const createTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => taskInput.parse(d))
