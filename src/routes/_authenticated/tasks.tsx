@@ -1212,7 +1212,7 @@ function TaskModal({
   epics: Epic[];
   sprints: Sprint[];
   stories: Story[];
-  onSubmit: (vals: Record<string, unknown>) => void;
+  onSubmit: (vals: TaskInput) => void;
 }) {
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
