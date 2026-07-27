@@ -40,7 +40,7 @@ interface SprintBurndownChartProps {
 
 export function SprintBurndownChart({ sprints, tasks, className = "" }: SprintBurndownChartProps) {
   // Active selected sprint ID
-  const [selectedSprintId, setSelectedSprintId] = useState<string>(sprints[0]?.id || "sprint-24-1");
+  const [selectedSprintId, setSelectedSprintId] = useState<string>(sprints[0]?.id ?? "");
   const [metricMode, setMetricMode] = useState<"points" | "tasks">("points");
 
   const currentSprint = useMemo(() => {
@@ -55,9 +55,9 @@ export function SprintBurndownChart({ sprints, tasks, className = "" }: SprintBu
 
   // Calculate totals
   const totalPlannedPoints = useMemo(() => {
-    if (metricMode === "tasks") return sprintTasks.length || 12;
+    if (metricMode === "tasks") return sprintTasks.length;
     const pts = sprintTasks.reduce((sum, t) => sum + (t.points || 1), 0);
-    return pts > 0 ? pts : 38; // Default demo baseline if no tasks created yet
+    return pts;
   }, [sprintTasks, metricMode]);
 
   const completedPoints = useMemo(() => {
