@@ -1237,8 +1237,8 @@ function TaskModal({
       epic_id: epicId || null,
       sprint_id: sprintId || null,
       story_id: storyId || null,
-      status,
-      priority,
+      status: status as TaskInput["status"],
+      priority: priority as TaskInput["priority"],
       points,
       due_date: dueDate || null,
     });
