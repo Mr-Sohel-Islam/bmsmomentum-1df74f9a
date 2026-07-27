@@ -147,16 +147,24 @@ export const listUsers = createServerFn({ method: "GET" })
     const { data: reserved } = await context.supabase.from("reserved_super_admins").select("email");
     const reservedEmails = new Set((reserved ?? []).map((r: { email: string }) => r.email));
 
-    return (profiles ?? []).map((p: Record<string, unknown>) => {
-      const email = emailByUser.get(p.id as string) ?? null;
+    return (profiles ?? []).map((p) => {
+      const email = emailByUser.get(p.id) ?? null;
       return {
-        ...p,
+        id: p.id as string,
+        full_name: (p.full_name ?? null) as string | null,
+        avatar_url: (p.avatar_url ?? null) as string | null,
+        department: (p.department ?? null) as string | null,
+        position_id: (p.position_id ?? null) as string | null,
+        manager_id: (p.manager_id ?? null) as string | null,
+        is_active: Boolean(p.is_active),
+        created_at: p.created_at as string,
         email,
         roles: rolesByUser.get(p.id) ?? [],
         permissions: permsByUser.get(p.id) ?? [],
         is_super_admin: email ? reservedEmails.has(email) : false,
       };
     });
+
   });
 
 export const getMyProfile = createServerFn({ method: "GET" })
