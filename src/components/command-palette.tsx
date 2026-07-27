@@ -49,25 +49,25 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   // Queries for real-time search across hierarchy
   const { data: tasks = [] } = useQuery({
     queryKey: ["tasks"],
-    queryFn: () => getTasks({ data: {} }),
+    queryFn: () => getTasks(),
     enabled: open,
   });
 
   const { data: epics = [] } = useQuery({
     queryKey: ["epics"],
-    queryFn: () => getEpics({ data: {} }),
+    queryFn: () => getEpics(),
     enabled: open,
   });
 
   const { data: teams = [] } = useQuery({
     queryKey: ["teams"],
-    queryFn: () => getTeams({ data: undefined }),
+    queryFn: () => getTeams(),
     enabled: open,
   });
 
   const { data: users = [] } = useQuery({
     queryKey: ["assignable_users"],
-    queryFn: () => getUsers({ data: {} }),
+    queryFn: () => getUsers(),
     enabled: open,
   });
 
@@ -180,7 +180,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             {epics.slice(0, 6).map((e) => (
               <CommandItem
                 key={e.id}
-                value={`epic ${e.title} ${e.status} ${e.priority}`}
+                value={`epic ${e.title} ${e.status}`}
                 onSelect={() => handleSelect(() => navigate({ to: "/tasks" }))}
                 className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer"
               >
@@ -228,18 +228,18 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             {users.slice(0, 8).map((u) => (
               <CommandItem
                 key={u.id}
-                value={`user ${u.full_name || ""} ${u.email || ""}`}
+                value={`user ${u.full_name || ""} ${u.department || ""}`}
                 onSelect={() => handleSelect(() => navigate({ to: "/admin/users" }))}
                 className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer"
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <User className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                   <span className="font-medium text-xs text-foreground truncate">
-                    {u.full_name || u.email || u.id.slice(0, 8)}
+                    {u.full_name || u.id.slice(0, 8)}
                   </span>
                 </div>
                 <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">
-                  {u.email || "No email"}
+                  {u.department || "No department"}
                 </span>
               </CommandItem>
             ))}

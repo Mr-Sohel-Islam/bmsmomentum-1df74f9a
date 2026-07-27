@@ -58,12 +58,20 @@ import {
   listEpics,
   listSprints,
   listStories,
+  createEpic,
+  createSprint,
+  createStory,
   TASK_STATUSES,
   TASK_PRIORITIES,
   type TaskStatus,
   type Epic,
   type Sprint,
   type Story,
+  type TaskInput,
+  type TaskUpdateInput,
+  type EpicInput,
+  type SprintInput,
+  type StoryInput,
 } from "@/lib/tasks.functions";
 import { listTeams, type Team } from "@/lib/teams.functions";
 import { useMyAccess } from "@/hooks/use-my-access";
@@ -71,7 +79,7 @@ import { useMyAccess } from "@/hooks/use-my-access";
 type UserOption = {
   id: string;
   full_name: string | null;
-  email: string | null;
+  email?: string | null;
 };
 
 export const Route = createFileRoute("/_authenticated/tasks")({
@@ -118,6 +126,9 @@ function TasksPage() {
   const fetchEpics = useServerFn(listEpics);
   const fetchSprints = useServerFn(listSprints);
   const fetchStories = useServerFn(listStories);
+  const createEpicFn = useServerFn(createEpic);
+  const createSprintFn = useServerFn(createSprint);
+  const createStoryFn = useServerFn(createStory);
 
   const create = useServerFn(createTask);
   const update = useServerFn(updateTask);
@@ -146,7 +157,14 @@ function TasksPage() {
     queryKey: ["tasks"],
     queryFn: () => fetchTasks(),
   });
-  const { data: users = [] } = useQuery({ queryKey: ["assignables"], queryFn: () => fetchUsers() });
+  const { data: usersData = [] } = useQuery({
+    queryKey: ["assignables"],
+    queryFn: () => fetchUsers(),
+  });
+  const users: UserOption[] = useMemo(
+    () => usersData.map((u) => ({ id: u.id, full_name: u.full_name })),
+    [usersData],
+  );
   const { data: teams = [] } = useQuery({ queryKey: ["teams"], queryFn: () => fetchTeams() });
   const { data: epicsData = [] } = useQuery({ queryKey: ["epics"], queryFn: () => fetchEpics() });
   const { data: sprintsData = [] } = useQuery({
@@ -158,22 +176,37 @@ function TasksPage() {
     queryFn: () => fetchStories(),
   });
 
-  // Local state management for full interactive hierarchy CRUD
-  const [epics, setEpics] = useState<Epic[]>([]);
-  const [sprints, setSprints] = useState<Sprint[]>([]);
-  const [stories, setStories] = useState<Story[]>([]);
+  const epics: Epic[] = epicsData;
+  const sprints: Sprint[] = sprintsData;
+  const stories: Story[] = storiesData;
 
-  useMemo(() => {
-    if (epicsData) setEpics(epicsData);
-  }, [epicsData]);
-
-  useMemo(() => {
-    if (sprintsData) setSprints(sprintsData);
-  }, [sprintsData]);
-
-  useMemo(() => {
-    if (storiesData) setStories(storiesData);
-  }, [storiesData]);
+  const epicMut = useMutation({
+    mutationFn: (v: EpicInput) => createEpicFn({ data: v }),
+    onSuccess: () => {
+      toast.success("Epic created");
+      setEpicDialogOpen(false);
+      qc.invalidateQueries({ queryKey: ["epics"] });
+    },
+    onError: (e: { message?: string }) => toast.error(e?.message ?? "Failed to create epic"),
+  });
+  const sprintMut = useMutation({
+    mutationFn: (v: SprintInput) => createSprintFn({ data: v }),
+    onSuccess: () => {
+      toast.success("Sprint created");
+      setSprintDialogOpen(false);
+      qc.invalidateQueries({ queryKey: ["sprints"] });
+    },
+    onError: (e: { message?: string }) => toast.error(e?.message ?? "Failed to create sprint"),
+  });
+  const storyMut = useMutation({
+    mutationFn: (v: StoryInput) => createStoryFn({ data: v }),
+    onSuccess: () => {
+      toast.success("Story created");
+      setStoryDialogOpen(false);
+      qc.invalidateQueries({ queryKey: ["stories"] });
+    },
+    onError: (e: { message?: string }) => toast.error(e?.message ?? "Failed to create story"),
+  });
 
   const [activeTab, setActiveTab] = useState("board");
   const [searchQuery, setSearchQuery] = useState("");
@@ -192,7 +225,7 @@ function TasksPage() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ["tasks"] });
 
   const createMut = useMutation({
-    mutationFn: (v: Parameters<typeof create>[0]["data"]) => create({ data: v }),
+    mutationFn: (v: TaskInput) => create({ data: v }),
     onSuccess: () => {
       toast.success("Task created");
       setTaskDialogOpen(false);
@@ -202,7 +235,7 @@ function TasksPage() {
   });
 
   const updateMut = useMutation({
-    mutationFn: (v: Parameters<typeof update>[0]["data"]) => update({ data: v }),
+    mutationFn: (v: TaskUpdateInput) => update({ data: v }),
     onSuccess: () => invalidate(),
     onError: (e: { message?: string }) => toast.error(e?.message ?? "Failed to update task"),
   });
@@ -617,14 +650,14 @@ function TasksPage() {
       <CreateEpicModal
         open={epicDialogOpen}
         setOpen={setEpicDialogOpen}
-        onAdd={(epic) => setEpics((prev) => [epic, ...prev])}
+        onAdd={(epic) => epicMut.mutate(epic)}
       />
 
       {/* Sprint Modal */}
       <CreateSprintModal
         open={sprintDialogOpen}
         setOpen={setSprintDialogOpen}
-        onAdd={(sprint) => setSprints((prev) => [sprint, ...prev])}
+        onAdd={(sprint) => sprintMut.mutate(sprint)}
       />
 
       {/* Story Modal */}
@@ -633,7 +666,7 @@ function TasksPage() {
         setOpen={setStoryDialogOpen}
         epics={epics}
         sprints={sprints}
-        onAdd={(story) => setStories((prev) => [story, ...prev])}
+        onAdd={(story) => storyMut.mutate(story)}
       />
 
       {/* Task Detail Dialog */}
@@ -1390,7 +1423,7 @@ function CreateEpicModal({
 }: {
   open: boolean;
   setOpen: (o: boolean) => void;
-  onAdd: (epic: Epic) => void;
+  onAdd: (epic: EpicInput) => void;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -1398,14 +1431,7 @@ function CreateEpicModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onAdd({
-      id: "epic-" + Date.now(),
-      title,
-      description: description || null,
-      status: "in_progress",
-      created_at: new Date().toISOString(),
-    });
-    toast.success("Epic created!");
+    onAdd({ title, description: description || null, status: "in_progress" });
     setTitle("");
     setDescription("");
     setOpen(false);
@@ -1443,7 +1469,7 @@ function CreateSprintModal({
 }: {
   open: boolean;
   setOpen: (o: boolean) => void;
-  onAdd: (sprint: Sprint) => void;
+  onAdd: (sprint: SprintInput) => void;
 }) {
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
@@ -1452,15 +1478,12 @@ function CreateSprintModal({
     e.preventDefault();
     if (!name.trim()) return;
     onAdd({
-      id: "sprint-" + Date.now(),
       name,
       goal: goal || null,
       start_date: new Date().toISOString().slice(0, 10),
       end_date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
       status: "planning",
-      created_at: new Date().toISOString(),
     });
-    toast.success("Sprint created!");
     setName("");
     setGoal("");
     setOpen(false);
@@ -1507,7 +1530,7 @@ function CreateStoryModal({
   setOpen: (o: boolean) => void;
   epics: Epic[];
   sprints: Sprint[];
-  onAdd: (story: Story) => void;
+  onAdd: (story: StoryInput) => void;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -1519,16 +1542,13 @@ function CreateStoryModal({
     e.preventDefault();
     if (!title.trim()) return;
     onAdd({
-      id: "story-" + Date.now(),
       title,
       description: description || null,
       epic_id: epicId || null,
       sprint_id: sprintId || null,
       points,
       status: "in_progress",
-      created_at: new Date().toISOString(),
     });
-    toast.success("User Story created!");
     setTitle("");
     setDescription("");
     setOpen(false);

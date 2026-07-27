@@ -4,7 +4,7 @@ import autoTable from "jspdf-autotable";
 export interface UserOption {
   id: string;
   full_name: string | null;
-  email: string | null;
+  email?: string | null;
   roles?: string[];
 }
 
@@ -13,7 +13,7 @@ export interface TeamMember {
   team_id: string;
   user_id: string;
   role: string;
-  user_name?: string;
+  user_name?: string | null;
 }
 
 export interface Team {
