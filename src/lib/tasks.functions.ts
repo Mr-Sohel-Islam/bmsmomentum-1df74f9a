@@ -124,9 +124,10 @@ export const bulkAssignTasks = createServerFn({ method: "POST" })
     const { error } = await context.supabase
       .from("tasks")
       .update({
-        ...(data.assignee_id !== undefined ? { assignee_id: data.assignee_id } : {}),
+        ...(data.assignee_id ? { assignee_id: data.assignee_id } : {}),
         ...(data.team_id !== undefined ? { team_id: data.team_id } : {}),
       })
+
       .in("id", data.ids);
     if (error) throw new Error(error.message);
     return { count: data.ids.length };
