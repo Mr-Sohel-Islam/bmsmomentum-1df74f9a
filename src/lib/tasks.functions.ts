@@ -82,17 +82,17 @@ export const updateTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => taskInput.partial().extend({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { id, ...patch } = data;
+    const { id, assignee_id, due_date, ...rest } = data;
     const { data: row, error } = await context.supabase
       .from("tasks")
       .update({
-        ...patch,
-        ...(patch.assignee_id ? { assignee_id: patch.assignee_id } : {}),
-        ...("due_date" in patch ? { due_date: patch.due_date || null } : {}),
-        ...(patch.status === "done" ? { completed_at: new Date().toISOString() } : {}),
+        ...rest,
+        ...(assignee_id ? { assignee_id } : {}),
+        ...("due_date" in data ? { due_date: due_date || null } : {}),
+        ...(rest.status === "done" ? { completed_at: new Date().toISOString() } : {}),
       })
-
       .eq("id", id)
+
       .select("*")
       .single();
     if (error) throw new Error(error.message);
