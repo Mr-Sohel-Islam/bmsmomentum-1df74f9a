@@ -131,7 +131,6 @@ function AdminApprovalsPage() {
           createMut.mutate({
             name,
             entity_type: entity as "task" | "score" | "report" | "appreciation",
-            active: true,
           });
           setName("");
         }}

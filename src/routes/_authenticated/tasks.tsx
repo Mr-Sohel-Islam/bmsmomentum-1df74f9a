@@ -573,7 +573,7 @@ function TasksPage() {
             onUpdateStatus={(taskId, newStatus) =>
               updateMut.mutate({
                 id: taskId,
-                status: newStatus as "todo" | "in_progress" | "review" | "done",
+                status: newStatus as TaskStatus,
               })
             }
             onSelectTask={(t) => setActiveTaskDetail(t)}
@@ -599,7 +599,6 @@ function TasksPage() {
         <TabsContent value="epics" className="space-y-6">
           <EpicsManager
             epics={epics}
-            setEpics={setEpics}
             tasks={tasks as Task[]}
             stories={stories}
           />
@@ -607,14 +606,13 @@ function TasksPage() {
 
         {/* Sprints View */}
         <TabsContent value="sprints" className="space-y-6">
-          <SprintsManager sprints={sprints} setSprints={setSprints} tasks={tasks as Task[]} />
+          <SprintsManager sprints={sprints} tasks={tasks as Task[]} />
         </TabsContent>
 
         {/* Stories View */}
         <TabsContent value="stories" className="space-y-6">
           <StoriesManager
             stories={stories}
-            setStories={setStories}
             epics={epics}
             sprints={sprints}
             tasks={tasks as Task[]}
@@ -678,7 +676,7 @@ function TasksPage() {
           onUpdateStatus={(newStatus) => {
             updateMut.mutate({
               id: activeTaskDetail.id,
-              status: newStatus as "todo" | "in_progress" | "review" | "done",
+              status: newStatus as TaskStatus,
             });
             setActiveTaskDetail((prev) => (prev ? { ...prev, status: newStatus } : null));
           }}
@@ -1033,12 +1031,10 @@ function HierarchyTreeView({
 // Epics Manager
 function EpicsManager({
   epics,
-  setEpics,
   tasks,
   stories,
 }: {
   epics: Epic[];
-  setEpics: React.Dispatch<React.SetStateAction<Epic[]>>;
   tasks: Task[];
   stories: Story[];
 }) {
@@ -1090,11 +1086,9 @@ function EpicsManager({
 // Sprints Manager
 function SprintsManager({
   sprints,
-  setSprints,
   tasks,
 }: {
   sprints: Sprint[];
-  setSprints: React.Dispatch<React.SetStateAction<Sprint[]>>;
   tasks: Task[];
 }) {
   return (
@@ -1147,13 +1141,11 @@ function SprintsManager({
 // Stories Manager
 function StoriesManager({
   stories,
-  setStories,
   epics,
   sprints,
   tasks,
 }: {
   stories: Story[];
-  setStories: React.Dispatch<React.SetStateAction<Story[]>>;
   epics: Epic[];
   sprints: Sprint[];
   tasks: Task[];
