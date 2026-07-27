@@ -182,10 +182,10 @@ export function generateAuditPdfReport(options: GeneratePdfOptions) {
     },
   });
 
-  interface DocWithAutoTable extends jsPDF {
+  type DocWithAutoTable = {
     lastAutoTable: { finalY: number };
     internal: { getNumberOfPages: () => number };
-  }
+  };
 
   currentY = (doc as unknown as DocWithAutoTable).lastAutoTable.finalY + 10;
 
