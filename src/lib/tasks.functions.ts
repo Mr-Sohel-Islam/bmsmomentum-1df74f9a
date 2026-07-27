@@ -87,9 +87,11 @@ export const updateTask = createServerFn({ method: "POST" })
       .from("tasks")
       .update({
         ...patch,
+        ...(patch.assignee_id ? { assignee_id: patch.assignee_id } : {}),
         ...("due_date" in patch ? { due_date: patch.due_date || null } : {}),
         ...(patch.status === "done" ? { completed_at: new Date().toISOString() } : {}),
       })
+
       .eq("id", id)
       .select("*")
       .single();
