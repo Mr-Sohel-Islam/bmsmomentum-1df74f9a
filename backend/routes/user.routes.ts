@@ -1,19 +1,20 @@
 import { Router } from "express";
 import { UserController } from "../controllers/user.controller";
 import { asyncHandler } from "../utils/response";
+import { requireAuth, requirePermission } from "../middleware/auth.middleware";
 
 const router = Router();
 
-router.get("/profiles", asyncHandler(UserController.getProfiles));
-router.get("/profiles/:id", asyncHandler(UserController.getProfileById));
-router.post("/profiles", asyncHandler(UserController.upsertProfile));
-router.put("/profiles/:id", asyncHandler(UserController.updateProfile));
-router.delete("/profiles/:id", asyncHandler(UserController.deleteUser));
+router.get("/profiles", requireAuth, requirePermission("users:read"), asyncHandler(UserController.getProfiles));
+router.get("/profiles/:id", requireAuth, requirePermission("users:read"), asyncHandler(UserController.getProfileById));
+router.post("/profiles", requireAuth, requirePermission("users:manage"), asyncHandler(UserController.upsertProfile));
+router.put("/profiles/:id", requireAuth, requirePermission("users:manage"), asyncHandler(UserController.updateProfile));
+router.delete("/profiles/:id", requireAuth, requirePermission("users:manage"), asyncHandler(UserController.deleteUser));
 
-router.put("/profiles/:id/roles", asyncHandler(UserController.setUserRoles));
-router.post("/roles", asyncHandler(UserController.addRole));
+router.put("/profiles/:id/roles", requireAuth, requirePermission("users:roles"), asyncHandler(UserController.setUserRoles));
+router.post("/roles", requireAuth, requirePermission("users:roles"), asyncHandler(UserController.addRole));
 
-router.put("/profiles/:id/permissions", asyncHandler(UserController.setUserPermissions));
-router.post("/permissions", asyncHandler(UserController.addPermission));
+router.put("/profiles/:id/permissions", requireAuth, requirePermission("users:roles"), asyncHandler(UserController.setUserPermissions));
+router.post("/permissions", requireAuth, requirePermission("users:roles"), asyncHandler(UserController.addPermission));
 
 export default router;

@@ -74,4 +74,22 @@ export class TeamController {
     const position = await TeamModel.createPosition(title, department || null, description || null);
     return sendSuccess(res, position, "Position created", 201);
   }
+
+  static async updatePosition(req: Request, res: Response) {
+    const id = req.params.id as string;
+    const position = await TeamModel.updatePosition(id, req.body);
+    if (!position) {
+      throw new AppError("Position not found", 404);
+    }
+    return sendSuccess(res, position, "Position updated");
+  }
+
+  static async deletePosition(req: Request, res: Response) {
+    const id = req.params.id as string;
+    const deleted = await TeamModel.deletePosition(id);
+    if (!deleted) {
+      throw new AppError("Position not found", 404);
+    }
+    return sendSuccess(res, { id }, "Position deleted");
+  }
 }

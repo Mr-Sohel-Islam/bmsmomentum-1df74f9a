@@ -164,4 +164,37 @@ export class TeamModel {
     const [rows] = await pool.query<RowDataPacket[]>("SELECT * FROM positions WHERE id = ?", [id]);
     return rows[0] as Position;
   }
+
+  static async updatePosition(
+    id: string,
+    updates: { title?: string; department?: string | null; description?: string | null },
+  ): Promise<Position | null> {
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    if (updates.title !== undefined) {
+      fields.push("title = ?");
+      values.push(updates.title);
+    }
+    if (updates.department !== undefined) {
+      fields.push("department = ?");
+      values.push(updates.department);
+    }
+    if (updates.description !== undefined) {
+      fields.push("description = ?");
+      values.push(updates.description);
+    }
+
+    if (fields.length > 0) {
+      values.push(id);
+      await pool.query(`UPDATE positions SET ${fields.join(", ")} WHERE id = ?`, values);
+    }
+
+    const [rows] = await pool.query<RowDataPacket[]>("SELECT * FROM positions WHERE id = ?", [id]);
+    return (rows[0] as Position) || null;
+  }
+
+  static async deletePosition(id: string): Promise<boolean> {
+    const [res] = await pool.query<ResultSetHeader>("DELETE FROM positions WHERE id = ?", [id]);
+    return res.affectedRows > 0;
+  }
 }
