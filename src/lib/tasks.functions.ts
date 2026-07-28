@@ -298,6 +298,7 @@ export const createSprint = createServerFn({ method: "POST" })
         start_date: z.string().optional().nullable(),
         end_date: z.string().optional().nullable(),
         status: z.enum(["planning", "active", "completed"]).default("planning"),
+        total_points: z.number().int().min(0).max(100000).default(0),
       })
       .parse(d),
   )
@@ -310,7 +311,9 @@ export const createSprint = createServerFn({ method: "POST" })
         start_date: data.start_date || null,
         end_date: data.end_date || null,
         status: data.status,
+        total_points: data.total_points,
       })
+
       .select("*")
       .single();
     if (error) throw new Error(error.message);
