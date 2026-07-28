@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { Search } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { getAuthToken } from "@/lib/api-client";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,9 @@ import { NotificationCenter } from "@/components/notification-center";
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/auth" });
-    return { user: data.user };
+    const token = getAuthToken();
+    if (!token) throw redirect({ to: "/auth" });
+    return { user: { id: "authenticated-user" } };
   },
   component: AuthedLayout,
 });
