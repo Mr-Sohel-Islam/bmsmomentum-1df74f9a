@@ -1,5 +1,7 @@
 import express, { Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { pool, initDb } from "./db";
+import { getCorsAllowedOrigins } from "./config/env";
 import { logger } from "./utils/logger";
 import { globalErrorHandler } from "./middleware/error.middleware";
 import apiRouter from "./routes";
@@ -7,6 +9,33 @@ import swaggerRouter from "./swagger";
 import { scheduler } from "./scheduler";
 
 export const app = express();
+
+// Configured CORS middleware using standard cors package
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      const allowedOrigins = getCorsAllowedOrigins();
+      if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, true);
+      }
+    },
+    credentials: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: [
+      "Origin",
+      "X-Requested-With",
+      "Content-Type",
+      "Accept",
+      "Authorization",
+      "x-user-id",
+      "x-user-role",
+      "x-user-email",
+    ],
+    optionsSuccessStatus: 204,
+  }),
+);
 
 app.use(express.json());
 

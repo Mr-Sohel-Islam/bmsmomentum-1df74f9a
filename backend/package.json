@@ -3,11 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx index.ts",
+    "dev": "nodemon --exec tsx index.ts",
     "start": "tsx index.ts",
     "build": "tsc"
   },
   "dependencies": {
+    "@types/cors": "^2.8.19",
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
@@ -17,6 +19,7 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.16.5",
+    "nodemon": "^3.1.14",
     "tsx": "^4.23.1",
     "typescript": "^5.8.3"
   }
