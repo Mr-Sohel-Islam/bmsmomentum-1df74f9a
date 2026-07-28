@@ -21,15 +21,86 @@ declare global {
 
 export type AuthRequest = Request;
 
+export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
+  super_admin: ["all"],
+  admin: ["all"],
+  product_owner: [
+    "tasks:read",
+    "tasks:create",
+    "tasks:update",
+    "tasks:delete",
+    "tasks:bulk",
+    "teams:read",
+    "approvals:read",
+    "approvals:create",
+    "approvals:action",
+  ],
+  scrum_master: [
+    "tasks:read",
+    "tasks:create",
+    "tasks:update",
+    "tasks:bulk",
+    "teams:read",
+    "teams:members",
+    "approvals:read",
+    "approvals:create",
+  ],
+  manager: [
+    "tasks:read",
+    "tasks:create",
+    "tasks:update",
+    "teams:read",
+    "teams:manage",
+    "teams:members",
+    "approvals:read",
+    "approvals:create",
+    "approvals:action",
+    "approvals:manage",
+    "performance:read",
+    "performance:evaluate",
+    "users:read",
+  ],
+  developer: [
+    "tasks:read",
+    "tasks:create",
+    "tasks:update",
+    "teams:read",
+    "approvals:read",
+    "approvals:create",
+    "performance:read",
+  ],
+  viewer: [
+    "tasks:read",
+    "teams:read",
+    "approvals:read",
+    "performance:read",
+    "users:read",
+  ],
+  guest: ["tasks:read"],
+};
+
+export function resolveUserPermissions(roles: string[], explicitPermissions: string[]): string[] {
+  const permSet = new Set<string>(explicitPermissions);
+  for (const role of roles) {
+    const rolePerms = DEFAULT_ROLE_PERMISSIONS[role] || [];
+    for (const p of rolePerms) {
+      permSet.add(p);
+    }
+  }
+  return Array.from(permSet);
+}
+
 export function signToken(
   payload: { id: string; email?: string; roles?: string[]; permissions?: string[] },
   expiresIn: string = env.JWT_EXPIRES_IN,
 ): string {
+  const roles = payload.roles && payload.roles.length > 0 ? payload.roles : ["developer"];
+  const allPermissions = resolveUserPermissions(roles, payload.permissions || []);
   const userPayload: AuthenticatedUser = {
     id: payload.id,
     email: payload.email || `${payload.id}@company.com`,
-    roles: payload.roles || ["user"],
-    permissions: payload.permissions || [],
+    roles,
+    permissions: allPermissions,
   };
   return jwt.sign(userPayload, env.JWT_SECRET, { expiresIn } as jwt.SignOptions);
 }
@@ -37,6 +108,8 @@ export function signToken(
 export function verifyToken(token: string): AuthenticatedUser {
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET) as AuthenticatedUser;
+    const roles = decoded.roles || ["developer"];
+    decoded.permissions = resolveUserPermissions(roles, decoded.permissions || []);
     return decoded;
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
@@ -52,11 +125,12 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     // For development / testing fallback via headers
     const mockUserId = req.headers["x-user-id"] as string;
     if (mockUserId) {
+      const mockRoles = [(req.headers["x-user-role"] as string) || "admin"];
       req.user = {
         id: mockUserId,
         email: (req.headers["x-user-email"] as string) || `${mockUserId}@company.com`,
-        roles: ["admin"],
-        permissions: ["all"],
+        roles: mockRoles,
+        permissions: resolveUserPermissions(mockRoles, ["all"]),
       };
       return next();
     }
@@ -86,11 +160,12 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
   } else {
     const mockUserId = req.headers["x-user-id"] as string;
     if (mockUserId) {
+      const mockRoles = [(req.headers["x-user-role"] as string) || "admin"];
       req.user = {
         id: mockUserId,
         email: (req.headers["x-user-email"] as string) || `${mockUserId}@company.com`,
-        roles: ["admin"],
-        permissions: ["all"],
+        roles: mockRoles,
+        permissions: resolveUserPermissions(mockRoles, ["all"]),
       };
     }
   }
@@ -103,11 +178,8 @@ export function requireRole(...allowedRoles: string[]) {
       throw new AppError("Authentication required", 401);
     }
     const hasRole = req.user.roles?.some((role) => allowedRoles.includes(role));
-    if (
-      !hasRole &&
-      !req.user.roles?.includes("admin") &&
-      !req.user.roles?.includes("super_admin")
-    ) {
+    const isRoot = req.user.roles?.includes("admin") || req.user.roles?.includes("super_admin");
+    if (!hasRole && !isRoot) {
       throw new AppError("Insufficient role permissions", 403);
     }
     next();
@@ -120,14 +192,14 @@ export function requirePermission(...requiredPermissions: string[]) {
       throw new AppError("Authentication required", 401);
     }
     const userPerms = req.user.permissions || [];
+    const isRoot = req.user.roles?.includes("admin") || req.user.roles?.includes("super_admin");
     const hasPerm =
-      userPerms.includes("all") || requiredPermissions.every((perm) => userPerms.includes(perm));
-    if (
-      !hasPerm &&
-      !req.user.roles?.includes("admin") &&
-      !req.user.roles?.includes("super_admin")
-    ) {
-      throw new AppError("Insufficient access permissions", 403);
+      isRoot ||
+      userPerms.includes("all") ||
+      requiredPermissions.some((perm) => userPerms.includes(perm));
+
+    if (!hasPerm) {
+      throw new AppError(`Missing required permission: ${requiredPermissions.join(", ")}`, 403);
     }
     next();
   };
