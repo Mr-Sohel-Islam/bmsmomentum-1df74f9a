@@ -1227,6 +1227,25 @@ function TaskModal({
   const [priority, setPriority] = useState<string>(task?.priority ?? "medium");
   const [points, setPoints] = useState<number>(task?.points ?? 1);
   const [dueDate, setDueDate] = useState<string>(task?.due_date ?? "");
+  const [startDate, setStartDate] = useState<string>(
+    (task as { start_date?: string | null } | null)?.start_date ?? "",
+  );
+  const [estimateValue, setEstimateValue] = useState<string>(
+    String((task as { estimate_value?: number | null } | null)?.estimate_value ?? ""),
+  );
+  const [estimateUnit, setEstimateUnit] = useState<string>(
+    (task as { estimate_unit?: string | null } | null)?.estimate_unit ?? "hours",
+  );
+
+  const derivedDays =
+    startDate && dueDate
+      ? Math.max(
+          0,
+          Math.round(
+            (new Date(dueDate).getTime() - new Date(startDate).getTime()) / 86400000,
+          ),
+        )
+      : null;
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1242,9 +1261,13 @@ function TaskModal({
       status: status as TaskInput["status"],
       priority: priority as TaskInput["priority"],
       points,
+      start_date: startDate || null,
       due_date: dueDate || null,
+      estimate_value: estimateValue === "" ? null : Number(estimateValue),
+      estimate_unit: estimateUnit as TaskInput["estimate_unit"],
     });
   };
+
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
