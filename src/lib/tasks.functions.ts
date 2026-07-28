@@ -103,7 +103,10 @@ export const createTask = createServerFn({ method: "POST" })
         status: data.status,
         priority: data.priority,
         points: data.points,
+        start_date: data.start_date || null,
         due_date: data.due_date || null,
+        estimate_value: data.estimate_value ?? null,
+        estimate_unit: data.estimate_unit,
       })
       .select("*")
       .single();
@@ -115,13 +118,15 @@ export const updateTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => taskInput.partial().extend({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { id, assignee_id, due_date, ...rest } = data;
+    const { id, assignee_id, due_date, start_date, estimate_value, ...rest } = data;
     const { data: row, error } = await context.supabase
       .from("tasks")
       .update({
         ...rest,
         ...(assignee_id ? { assignee_id } : {}),
         ...("due_date" in data ? { due_date: due_date || null } : {}),
+        ...("start_date" in data ? { start_date: start_date || null } : {}),
+        ...("estimate_value" in data ? { estimate_value: estimate_value ?? null } : {}),
         ...(rest.status === "done" ? { completed_at: new Date().toISOString() } : {}),
       })
       .eq("id", id)
@@ -131,6 +136,7 @@ export const updateTask = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return row;
   });
+
 
 export const deleteTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
