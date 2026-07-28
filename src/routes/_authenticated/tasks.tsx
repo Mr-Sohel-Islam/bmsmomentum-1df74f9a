@@ -616,7 +616,13 @@ function TasksPage() {
             epics={epics}
             sprints={sprints}
             tasks={tasks as Task[]}
+            onAddTask={(story) => {
+              setEditingTask(null);
+              setPrefillStory(story);
+              setTaskDialogOpen(true);
+            }}
           />
+
         </TabsContent>
 
         {/* Analytics & Sprint Burndown View */}
