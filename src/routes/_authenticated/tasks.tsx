@@ -1516,12 +1516,14 @@ function CreateStoryModal({
   setOpen,
   epics,
   sprints,
+  stories,
   onAdd,
 }: {
   open: boolean;
   setOpen: (o: boolean) => void;
   epics: Epic[];
   sprints: Sprint[];
+  stories: Story[];
   onAdd: (story: StoryInput) => void;
 }) {
   const [title, setTitle] = useState("");
@@ -1529,6 +1531,13 @@ function CreateStoryModal({
   const [epicId, setEpicId] = useState("");
   const [sprintId, setSprintId] = useState("");
   const [points, setPoints] = useState(5);
+
+  const sprint = sprints.find((s) => s.id === sprintId) ?? null;
+  const budget = (sprint as { total_points?: number } | null)?.total_points ?? 0;
+  const allocated = stories
+    .filter((s) => s.sprint_id === sprintId)
+    .reduce((sum, s) => sum + (s.points ?? 0), 0);
+  const remaining = budget - allocated - points;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1561,7 +1570,7 @@ function CreateStoryModal({
             <Label>Description</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label>Epic</Label>
               <select
@@ -1592,7 +1601,45 @@ function CreateStoryModal({
                 ))}
               </select>
             </div>
+            <div className="space-y-1.5">
+              <Label>Points</Label>
+              <Input
+                type="number"
+                min={0}
+                value={points}
+                onChange={(e) => setPoints(Number(e.target.value))}
+              />
+            </div>
           </div>
+
+          {sprintId && (
+            <div className="rounded-md border border-border/60 bg-muted/30 p-3">
+              <div className="flex items-center justify-between font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+                <span>Sprint point distribution</span>
+                <span>
+                  {allocated + points} / {budget || "∞"}
+                </span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={`h-full ${remaining < 0 ? "bg-destructive" : "bg-primary"}`}
+                  style={{
+                    width: budget
+                      ? `${Math.min(100, ((allocated + points) / budget) * 100)}%`
+                      : "0%",
+                  }}
+                />
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {budget === 0
+                  ? "No point budget set for this sprint."
+                  : remaining < 0
+                    ? `Over budget by ${Math.abs(remaining)} pts.`
+                    : `${remaining} pts remaining after this story.`}
+              </p>
+            </div>
+          )}
+
           <DialogFooter>
             <Button type="submit">Create Story</Button>
           </DialogFooter>
