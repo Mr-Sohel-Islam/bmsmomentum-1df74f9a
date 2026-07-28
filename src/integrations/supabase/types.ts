@@ -161,6 +161,7 @@ export type Database = {
       approval_workflows: {
         Row: {
           active: boolean
+          authority_level: number
           created_at: string
           created_by: string | null
           entity_type: string
@@ -170,6 +171,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          authority_level?: number
           created_at?: string
           created_by?: string | null
           entity_type: string
@@ -179,6 +181,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          authority_level?: number
           created_at?: string
           created_by?: string | null
           entity_type?: string
@@ -322,6 +325,78 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          link: string | null
+          message: string
+          read: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          link?: string | null
+          message: string
+          read?: boolean
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          link?: string | null
+          message?: string
+          read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      performance_shares: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          owner_id: string
+          period: string
+          shared_with: string
+          snapshot: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          owner_id: string
+          period: string
+          shared_with: string
+          snapshot?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          owner_id?: string
+          period?: string
+          shared_with?: string
+          snapshot?: Json
+        }
+        Relationships: []
+      }
       positions: {
         Row: {
           created_at: string
@@ -458,6 +533,7 @@ export type Database = {
           name: string
           start_date: string | null
           status: string
+          total_points: number
           updated_at: string
         }
         Insert: {
@@ -468,6 +544,7 @@ export type Database = {
           name: string
           start_date?: string | null
           status?: string
+          total_points?: number
           updated_at?: string
         }
         Update: {
@@ -478,6 +555,7 @@ export type Database = {
           name?: string
           start_date?: string | null
           status?: string
+          total_points?: number
           updated_at?: string
         }
         Relationships: []
@@ -575,10 +653,13 @@ export type Database = {
           description: string | null
           due_date: string | null
           epic_id: string | null
+          estimate_unit: string
+          estimate_value: number | null
           id: string
           points: number
           priority: string
           sprint_id: string | null
+          start_date: string | null
           status: string
           story_id: string | null
           team_id: string | null
@@ -594,10 +675,13 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           epic_id?: string | null
+          estimate_unit?: string
+          estimate_value?: number | null
           id?: string
           points?: number
           priority?: string
           sprint_id?: string | null
+          start_date?: string | null
           status?: string
           story_id?: string | null
           team_id?: string | null
@@ -613,10 +697,13 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           epic_id?: string | null
+          estimate_unit?: string
+          estimate_value?: number | null
           id?: string
           points?: number
           priority?: string
           sprint_id?: string | null
+          start_date?: string | null
           status?: string
           story_id?: string | null
           team_id?: string | null
@@ -775,6 +862,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      authority_level: { Args: { _user_id: string }; Returns: number }
       can_approve_request: {
         Args: { _request_id: string; _user_id: string }
         Returns: boolean
@@ -815,6 +903,19 @@ export type Database = {
         Returns: boolean
       }
       is_reserved_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      notify_user: {
+        Args: {
+          _actor?: string
+          _entity_id?: string
+          _entity_type?: string
+          _link?: string
+          _message: string
+          _title: string
+          _type: string
+          _user: string
+        }
+        Returns: undefined
+      }
       open_approval_request: {
         Args: { _entity_id: string; _entity_type: string; _requester: string }
         Returns: string
