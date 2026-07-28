@@ -1236,6 +1236,7 @@ function TaskModal({
   open,
   setOpen,
   task,
+  defaults,
   users,
   teams,
   epics,
@@ -1246,7 +1247,9 @@ function TaskModal({
   open: boolean;
   setOpen: (o: boolean) => void;
   task: Task | null;
+  defaults?: { story_id?: string | null; epic_id?: string | null; sprint_id?: string | null } | null;
   users: UserOption[];
+
   teams: Team[];
   epics: Epic[];
   sprints: Sprint[];
