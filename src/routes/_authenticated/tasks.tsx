@@ -635,14 +635,28 @@ function TasksPage() {
 
       {/* Task Creation & Edit Modal */}
       <TaskModal
+        key={editingTask?.id ?? prefillStory?.id ?? "new"}
         open={taskDialogOpen}
-        setOpen={setTaskDialogOpen}
+        setOpen={(o) => {
+          setTaskDialogOpen(o);
+          if (!o) setPrefillStory(null);
+        }}
         task={editingTask}
+        defaults={
+          prefillStory
+            ? {
+                story_id: prefillStory.id,
+                epic_id: prefillStory.epic_id,
+                sprint_id: prefillStory.sprint_id,
+              }
+            : null
+        }
         users={users}
         teams={teams}
         epics={epics}
         sprints={sprints}
         stories={stories}
+
         onSubmit={(vals) => {
           if (editingTask) {
             updateMut.mutate({ id: editingTask.id, ...vals });
