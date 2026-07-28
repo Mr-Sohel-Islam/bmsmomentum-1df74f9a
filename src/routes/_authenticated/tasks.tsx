@@ -1467,6 +1467,11 @@ function CreateSprintModal({
 }) {
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [endDate, setEndDate] = useState(
+    new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+  );
+  const [totalPoints, setTotalPoints] = useState(40);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1474,9 +1479,10 @@ function CreateSprintModal({
     onAdd({
       name,
       goal: goal || null,
-      start_date: new Date().toISOString().slice(0, 10),
-      end_date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+      start_date: startDate || null,
+      end_date: endDate || null,
       status: "planning",
+      total_points: totalPoints,
     });
     setName("");
     setGoal("");
@@ -1503,7 +1509,35 @@ function CreateSprintModal({
             <Label>Sprint Goal</Label>
             <Textarea value={goal} onChange={(e) => setGoal(e.target.value)} />
           </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label>Starts</Label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Ends</Label>
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Point budget</Label>
+              <Input
+                type="number"
+                min={0}
+                value={totalPoints}
+                onChange={(e) => setTotalPoints(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            The total point budget is fixed at sprint creation; story and task points are
+            distributed against it.
+          </p>
           <DialogFooter>
+
             <Button type="submit">Create Sprint</Button>
           </DialogFooter>
         </form>
