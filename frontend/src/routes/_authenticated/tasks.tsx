@@ -702,7 +702,7 @@ function TasksPage() {
               id: activeTaskDetail.id,
               status: newStatus as TaskStatus,
             });
-            setActiveTaskDetail((prev) => (prev ? { ...prev, status: newStatus } : null));
+            setActiveTaskDetail((prev) => (prev ? { ...prev, status: newStatus as TaskStatus } : null));
           }}
           users={users}
           teams={teams}

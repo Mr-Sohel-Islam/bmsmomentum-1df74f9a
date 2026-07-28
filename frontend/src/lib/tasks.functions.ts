@@ -1,42 +1,76 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { withNames, namesFor } from "./tasks.server";
-import type { TaskWithNames } from "./tasks.server";
-import type { Database } from "@/integrations/supabase/types";
+import { apiClient } from "./api-client";
 
 export const TASK_STATUSES = ["todo", "in_progress", "blocked", "done"] as const;
 export const TASK_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 export type TaskPriority = (typeof TASK_PRIORITIES)[number];
-export type Task = TaskWithNames;
 
-export type Epic = Database["public"]["Tables"]["epics"]["Row"];
-export type Sprint = Database["public"]["Tables"]["sprints"]["Row"];
-export type Story = Database["public"]["Tables"]["stories"]["Row"];
+export interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  team_id: string | null;
+  assignee_id: string | null;
+  assignee_name?: string | null;
+  assigner_id: string | null;
+  reporter_id: string | null;
+  reporter_name?: string | null;
+  sprint_id: string | null;
+  sprint_name?: string | null;
+  epic_id: string | null;
+  epic_title?: string | null;
+  story_id: string | null;
+  story_title?: string | null;
+  points: number;
+  start_date?: string | null;
+  due_date: string | null;
+  estimate_value?: number | null;
+  estimate_unit?: string | null;
+  completed_at?: string | null;
+  created_at: string;
+}
 
-export const listTasks = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<Task[]> => {
-    const { data, error } = await context.supabase
-      .from("tasks")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    return withNames(context.supabase, data ?? []);
-  });
+export interface Epic {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  color?: string;
+  created_at: string;
+}
 
-export const listAssignableUsers = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("profiles")
-      .select("id, full_name, avatar_url, department, is_active")
-      .eq("is_active", true)
-      .order("full_name");
-    if (error) throw new Error(error.message);
-    return data ?? [];
-  });
+export interface Sprint {
+  id: string;
+  name: string;
+  goal: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface Story {
+  id: string;
+  epic_id: string | null;
+  sprint_id?: string | null;
+  title: string;
+  description: string | null;
+  points: number;
+  status: string;
+  created_at: string;
+}
+
+export const listTasks = createServerFn({ method: "GET" }).handler(async (): Promise<Task[]> => {
+  return apiClient.get<Task[]>("/tasks");
+});
+
+export const listAssignableUsers = createServerFn({ method: "GET" }).handler(async () => {
+  return apiClient.get<any[]>("/profiles");
+});
 
 export const ESTIMATE_UNITS = ["hours", "days"] as const;
 export type EstimateUnit = (typeof ESTIMATE_UNITS)[number];
@@ -83,266 +117,115 @@ export type StoryInput = {
   status?: "backlog" | "in_progress" | "review" | "done";
 };
 
-
-
 export const createTask = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => taskInput.parse(d))
-  .handler(async ({ data, context }) => {
-    const { data: row, error } = await context.supabase
-      .from("tasks")
-      .insert({
-        title: data.title,
-        description: data.description || null,
-        assignee_id: data.assignee_id || context.userId,
-        assigner_id: context.userId,
-        team_id: data.team_id || null,
-        epic_id: data.epic_id || null,
-        sprint_id: data.sprint_id || null,
-        story_id: data.story_id || null,
-        status: data.status,
-        priority: data.priority,
-        points: data.points,
-        start_date: data.start_date || null,
-        due_date: data.due_date || null,
-        estimate_value: data.estimate_value ?? null,
-        estimate_unit: data.estimate_unit,
-      })
-      .select("*")
-      .single();
-    if (error) throw new Error(error.message);
-    return row;
+  .handler(async ({ data }) => {
+    return apiClient.post<Task>("/tasks", data);
   });
 
 export const updateTask = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => taskInput.partial().extend({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { id, assignee_id, due_date, start_date, estimate_value, ...rest } = data;
-    const { data: row, error } = await context.supabase
-      .from("tasks")
-      .update({
-        ...rest,
-        ...(assignee_id ? { assignee_id } : {}),
-        ...("due_date" in data ? { due_date: due_date || null } : {}),
-        ...("start_date" in data ? { start_date: start_date || null } : {}),
-        ...("estimate_value" in data ? { estimate_value: estimate_value ?? null } : {}),
-        ...(rest.status === "done" ? { completed_at: new Date().toISOString() } : {}),
-      })
-      .eq("id", id)
-
-      .select("*")
-      .single();
-    if (error) throw new Error(error.message);
-    return row;
+  .handler(async ({ data }) => {
+    const { id, ...patch } = data;
+    return apiClient.put<Task>(`/tasks/${id}`, patch);
   });
 
-
 export const deleteTask = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("tasks").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+  .handler(async ({ data }) => {
+    return apiClient.delete<{ id: string }>(`/tasks/${data.id}`);
   });
 
 export const bulkAssignTasks = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
-        ids: z.array(z.string().uuid()),
+        task_ids: z.array(z.string().uuid()).min(1),
         assignee_id: z.string().uuid().optional().nullable(),
         team_id: z.string().uuid().optional().nullable(),
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => {
-    if (data.ids.length === 0) return { count: 0 };
-    const { error } = await context.supabase
-      .from("tasks")
-      .update({
-        ...(data.assignee_id ? { assignee_id: data.assignee_id } : {}),
-        ...(data.team_id !== undefined ? { team_id: data.team_id } : {}),
-      })
-
-      .in("id", data.ids);
-    if (error) throw new Error(error.message);
-    return { count: data.ids.length };
+  .handler(async ({ data }) => {
+    return apiClient.post<{ count: number }>("/tasks/bulk-assign", {
+      ids: data.task_ids,
+      assignee_id: data.assignee_id,
+      team_id: data.team_id,
+    });
   });
 
-export const bulkUpdateTaskStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
-    z.object({ ids: z.array(z.string().uuid()), status: z.enum(TASK_STATUSES) }).parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    if (data.ids.length === 0) return { count: 0 };
-    const { error } = await context.supabase
-      .from("tasks")
-      .update({
-        status: data.status,
-        ...(data.status === "done" ? { completed_at: new Date().toISOString() } : {}),
-      })
-      .in("id", data.ids);
-    if (error) throw new Error(error.message);
-    return { count: data.ids.length };
-  });
-
-export const bulkDeleteTasks = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ ids: z.array(z.string().uuid()) }).parse(d))
-  .handler(async ({ data, context }) => {
-    if (data.ids.length === 0) return { count: 0 };
-    const { error } = await context.supabase.from("tasks").delete().in("id", data.ids);
-    if (error) throw new Error(error.message);
-    return { count: data.ids.length };
-  });
-
-export const listTaskComments = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ task_id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { data: rows, error } = await context.supabase
-      .from("task_comments")
-      .select("id, task_id, author_id, body, created_at")
-      .eq("task_id", data.task_id)
-      .order("created_at");
-    if (error) throw new Error(error.message);
-    const map = await namesFor(
-      context.supabase,
-      (rows ?? []).map((r) => r.author_id),
-    );
-    return (rows ?? []).map((r) => ({
-      ...r,
-      author_name: (map.get(r.author_id) ?? null) as string | null,
-    }));
-  });
-
-export const addTaskComment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
-    z.object({ task_id: z.string().uuid(), body: z.string().min(1).max(2000) }).parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
-      .from("task_comments")
-      .insert({ task_id: data.task_id, body: data.body, author_id: context.userId });
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
-
-// ---------- Epics ----------
-export const listEpics = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<Epic[]> => {
-    const { data, error } = await context.supabase
-      .from("epics")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    return data ?? [];
-  });
-
-export const createEpic = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+export const bulkUpdateStatus = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        title: z.string().min(1).max(160),
-        description: z.string().max(1000).optional().nullable(),
-        status: z.enum(["planning", "in_progress", "completed"]).default("planning"),
-        color: z.string().max(20).default("#10b981"),
+        task_ids: z.array(z.string().uuid()).min(1),
+        status: z.enum(TASK_STATUSES),
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => {
-    const { data: row, error } = await context.supabase
-      .from("epics")
-      .insert({ ...data, description: data.description || null })
-      .select("*")
-      .single();
-    if (error) throw new Error(error.message);
-    return row;
+  .handler(async ({ data }) => {
+    return apiClient.post<{ count: number }>("/tasks/bulk-status", {
+      ids: data.task_ids,
+      status: data.status,
+    });
   });
 
-export const deleteEpic = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("epics").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+export const bulkUpdateTaskStatus = bulkUpdateStatus;
+
+export const bulkDeleteTasks = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z.object({ task_ids: z.array(z.string().uuid()).min(1) }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    return apiClient.post<{ count: number }>("/tasks/bulk-delete", {
+      ids: data.task_ids,
+    });
   });
 
-// ---------- Sprints ----------
-export const listSprints = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<Sprint[]> => {
-    const { data, error } = await context.supabase
-      .from("sprints")
-      .select("*")
-      .order("start_date", { ascending: false });
-    if (error) throw new Error(error.message);
-    return data ?? [];
+export const listEpics = createServerFn({ method: "GET" }).handler(async (): Promise<Epic[]> => {
+  return apiClient.get<Epic[]>("/epics");
+});
+
+export const createEpic = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        title: z.string().min(1).max(120),
+        description: z.string().max(1000).optional().nullable(),
+        color: z.string().max(30).default("#10b981"),
+        status: z.enum(["planning", "in_progress", "completed", "open"]).default("open"),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    return apiClient.post<Epic>("/epics", data);
   });
+
+export const listSprints = createServerFn({ method: "GET" }).handler(async (): Promise<Sprint[]> => {
+  return apiClient.get<Sprint[]>("/sprints");
+});
 
 export const createSprint = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
         name: z.string().min(1).max(120),
-        goal: z.string().max(500).optional().nullable(),
+        goal: z.string().max(1000).optional().nullable(),
         start_date: z.string().optional().nullable(),
         end_date: z.string().optional().nullable(),
         status: z.enum(["planning", "active", "completed"]).default("planning"),
-        total_points: z.number().int().min(0).max(100000).default(0),
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => {
-    const { data: row, error } = await context.supabase
-      .from("sprints")
-      .insert({
-        name: data.name,
-        goal: data.goal || null,
-        start_date: data.start_date || null,
-        end_date: data.end_date || null,
-        status: data.status,
-        total_points: data.total_points,
-      })
-
-      .select("*")
-      .single();
-    if (error) throw new Error(error.message);
-    return row;
+  .handler(async ({ data }) => {
+    return apiClient.post<Sprint>("/sprints", data);
   });
 
-export const deleteSprint = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("sprints").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
-
-// ---------- Stories ----------
-export const listStories = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<Story[]> => {
-    const { data, error } = await context.supabase
-      .from("stories")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    return data ?? [];
-  });
+export const listStories = createServerFn({ method: "GET" }).handler(async (): Promise<Story[]> => {
+  return apiClient.get<Story[]>("/stories");
+});
 
 export const createStory = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -350,33 +233,30 @@ export const createStory = createServerFn({ method: "POST" })
         description: z.string().max(1000).optional().nullable(),
         epic_id: z.string().uuid().optional().nullable(),
         sprint_id: z.string().uuid().optional().nullable(),
-        points: z.number().int().min(0).max(200).default(0),
+        points: z.number().int().min(0).max(100).default(0),
         status: z.enum(["backlog", "in_progress", "review", "done"]).default("backlog"),
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => {
-    const { data: row, error } = await context.supabase
-      .from("stories")
-      .insert({
-        title: data.title,
-        description: data.description || null,
-        epic_id: data.epic_id || null,
-        sprint_id: data.sprint_id || null,
-        points: data.points,
-        status: data.status,
-      })
-      .select("*")
-      .single();
-    if (error) throw new Error(error.message);
-    return row;
+  .handler(async ({ data }) => {
+    return apiClient.post<Story>("/stories", data);
   });
 
-export const deleteStory = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("stories").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+export const listTaskComments = createServerFn({ method: "GET" })
+  .inputValidator((d: unknown) => z.object({ task_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    return apiClient.get<any[]>(`/tasks/${data.task_id}/comments`);
+  });
+
+export const addTaskComment = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        task_id: z.string().uuid(),
+        body: z.string().min(1).max(2000),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    return apiClient.post<any>(`/tasks/${data.task_id}/comments`, { body: data.body });
   });

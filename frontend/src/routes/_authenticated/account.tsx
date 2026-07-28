@@ -76,7 +76,7 @@ function AccountPage() {
                 {data.roles.length === 0 && (
                   <span className="text-xs text-muted-foreground">None</span>
                 )}
-                {data.roles.map((r) => (
+                {data.roles.map((r: string) => (
                   <Badge
                     key={r}
                     variant={r === "super_admin" ? "default" : "secondary"}
@@ -94,7 +94,7 @@ function AccountPage() {
                 {data.permissions.length === 0 && (
                   <span className="text-xs text-muted-foreground">Inherited from role</span>
                 )}
-                {data.permissions.map((p) => (
+                {data.permissions.map((p: string) => (
                   <Badge key={p} variant="outline">
                     {p}
                   </Badge>
