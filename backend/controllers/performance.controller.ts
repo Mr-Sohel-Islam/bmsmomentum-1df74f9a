@@ -24,7 +24,7 @@ export class PerformanceController {
   }
 
   static async updateMetric(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const metric = await PerformanceModel.updateMetric(id, req.body);
     if (!metric) {
       throw new AppError("Metric not found", 404);
@@ -33,7 +33,7 @@ export class PerformanceController {
   }
 
   static async deleteMetric(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const deleted = await PerformanceModel.deleteMetric(id);
     if (!deleted) {
       throw new AppError("Metric not found", 404);
@@ -47,7 +47,7 @@ export class PerformanceController {
   }
 
   static async getUserScores(req: Request, res: Response) {
-    const { userId } = req.params;
+    const userId = req.params.userId as string;
     const scores = await PerformanceModel.findMetricScoresByUser(userId);
     return sendSuccess(res, scores);
   }
@@ -69,7 +69,7 @@ export class PerformanceController {
   }
 
   static async deleteScore(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const deleted = await PerformanceModel.deleteMetricScore(id);
     if (!deleted) {
       throw new AppError("Score not found", 404);

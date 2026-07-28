@@ -18,7 +18,7 @@ export class TeamController {
   }
 
   static async updateTeam(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const team = await TeamModel.updateTeam(id, req.body);
     if (!team) {
       throw new AppError("Team not found", 404);
@@ -27,7 +27,7 @@ export class TeamController {
   }
 
   static async deleteTeam(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const deleted = await TeamModel.deleteTeam(id);
     if (!deleted) {
       throw new AppError("Team not found", 404);
@@ -36,13 +36,13 @@ export class TeamController {
   }
 
   static async getTeamMembers(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const members = await TeamModel.getTeamMembers(id);
     return sendSuccess(res, members);
   }
 
   static async addTeamMember(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { user_id, role } = req.body;
     if (!user_id) {
       throw new AppError("user_id is required", 400);
@@ -52,7 +52,8 @@ export class TeamController {
   }
 
   static async removeTeamMember(req: Request, res: Response) {
-    const { id, userId } = req.params;
+    const id = req.params.id as string;
+    const userId = req.params.userId as string;
     const removed = await TeamModel.removeTeamMember(id, userId);
     if (!removed) {
       throw new AppError("Member or team not found", 404);

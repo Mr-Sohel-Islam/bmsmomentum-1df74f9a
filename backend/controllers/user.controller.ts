@@ -9,7 +9,7 @@ export class UserController {
   }
 
   static async getProfileById(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const profile = await UserModel.findProfileById(id);
     if (!profile) {
       throw new AppError("Profile not found", 404);
@@ -27,7 +27,7 @@ export class UserController {
   }
 
   static async updateProfile(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const profile = await UserModel.updateProfile(id, req.body);
     if (!profile) {
       throw new AppError("Profile not found", 404);
@@ -36,7 +36,7 @@ export class UserController {
   }
 
   static async deleteUser(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const deleted = await UserModel.deleteUser(id);
     if (!deleted) {
       throw new AppError("User profile not found", 404);
@@ -45,7 +45,7 @@ export class UserController {
   }
 
   static async setUserRoles(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { roles } = req.body;
     if (!Array.isArray(roles)) {
       throw new AppError("roles must be an array of strings", 400);
@@ -64,7 +64,7 @@ export class UserController {
   }
 
   static async setUserPermissions(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { permissions } = req.body;
     if (!Array.isArray(permissions)) {
       throw new AppError("permissions must be an array of strings", 400);

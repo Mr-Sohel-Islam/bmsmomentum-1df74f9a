@@ -23,7 +23,7 @@ export class ApprovalController {
   }
 
   static async updateWorkflow(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const workflow = await ApprovalModel.updateWorkflow(id, req.body);
     if (!workflow) {
       throw new AppError("Workflow not found", 404);
@@ -32,7 +32,7 @@ export class ApprovalController {
   }
 
   static async deleteWorkflow(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const deleted = await ApprovalModel.deleteWorkflow(id);
     if (!deleted) {
       throw new AppError("Workflow not found", 404);
@@ -41,7 +41,7 @@ export class ApprovalController {
   }
 
   static async addStep(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { step_order, approver_type, approver_ref, approver_id } = req.body;
     if (!approver_type) {
       throw new AppError("approver_type is required", 400);
@@ -58,7 +58,7 @@ export class ApprovalController {
   }
 
   static async deleteStep(req: Request, res: Response) {
-    const { stepId } = req.params;
+    const stepId = req.params.stepId as string;
     const deleted = await ApprovalModel.deleteStep(stepId);
     if (!deleted) {
       throw new AppError("Step not found", 404);
@@ -89,7 +89,7 @@ export class ApprovalController {
   }
 
   static async recordAction(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { approver_id, step_order, decision, note } = req.body;
     const userId = req.user?.id || approver_id;
     if (!decision || !["approved", "rejected"].includes(decision)) {

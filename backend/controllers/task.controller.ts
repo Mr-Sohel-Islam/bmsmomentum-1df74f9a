@@ -9,7 +9,7 @@ export class TaskController {
   }
 
   static async getTaskById(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const task = await TaskModel.findTaskById(id);
     if (!task) {
       throw new AppError("Task not found", 404);
@@ -51,7 +51,7 @@ export class TaskController {
   }
 
   static async updateTask(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const task = await TaskModel.updateTask(id, req.body);
     if (!task) {
       throw new AppError("Task not found", 404);
@@ -60,7 +60,7 @@ export class TaskController {
   }
 
   static async deleteTask(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const deleted = await TaskModel.deleteTask(id);
     if (!deleted) {
       throw new AppError("Task not found", 404);
@@ -96,13 +96,13 @@ export class TaskController {
   }
 
   static async getComments(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const comments = await TaskModel.findCommentsByTaskId(id);
     return sendSuccess(res, comments);
   }
 
   static async addComment(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { body, user_id } = req.body;
     const authorId = req.user?.id || user_id || "anonymous";
     if (!body) {
