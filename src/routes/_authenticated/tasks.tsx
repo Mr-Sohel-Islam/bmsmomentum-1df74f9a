@@ -138,6 +138,8 @@ function TasksPage() {
   const bulkDeleteFn = useServerFn(bulkDeleteTasks);
 
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [prefillStory, setPrefillStory] = useState<Story | null>(null);
+
 
   const toggleTaskSelection = (id: string) => {
     setSelectedTaskIds((prev) =>
