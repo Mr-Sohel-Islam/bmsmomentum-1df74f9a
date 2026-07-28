@@ -347,6 +347,95 @@ export async function initDb() {
     await addColumnIfNotExist(connection, "metric_scores", "value", "DOUBLE DEFAULT 0");
     await addColumnIfNotExist(connection, "metric_scores", "recorded_by", "VARCHAR(36)");
 
+    // Seed initial Super Admin & realistic team members if profiles table is empty
+    const [existingProfiles] = await connection.query<mysql.RowDataPacket[]>(
+      "SELECT COUNT(*) as count FROM profiles",
+    );
+    const profileCount = Number((existingProfiles as any)[0]?.count || 0);
+
+    // Always seed reserved super admin email into reserved_super_admins table
+    await connection.query(
+      "INSERT IGNORE INTO reserved_super_admins (id, email) VALUES (?, ?)",
+      ["rsa-super-admin", "soheljavadeveloper@gmail.com"],
+    );
+
+    if (profileCount === 0) {
+      console.log("[MySQL Backend] Seeding Super Admin & initial team members...");
+
+      const seedMembers = [
+        {
+          id: "soheljavadeveloper",
+          full_name: "Sohel Islam (Super Admin)",
+          department: "Executive Leadership",
+          roles: ["super_admin", "admin"],
+          avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=sohel",
+        },
+        {
+          id: "alex.rivera",
+          full_name: "Alex Rivera",
+          department: "Engineering",
+          roles: ["scrum_master"],
+          avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=alex",
+        },
+        {
+          id: "sarah.chen",
+          full_name: "Sarah Chen",
+          department: "Product Management",
+          roles: ["product_owner"],
+          avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=sarah",
+        },
+        {
+          id: "marcus.vance",
+          full_name: "Marcus Vance",
+          department: "Engineering",
+          roles: ["developer"],
+          avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=marcus",
+        },
+        {
+          id: "elena.rostova",
+          full_name: "Elena Rostova",
+          department: "Quality Assurance",
+          roles: ["developer"],
+          avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=elena",
+        },
+      ];
+
+      for (const m of seedMembers) {
+        await connection.query(
+          "INSERT INTO profiles (id, full_name, avatar_url, department, is_active) VALUES (?, ?, ?, ?, 1) ON DUPLICATE KEY UPDATE full_name = VALUES(full_name)",
+          [m.id, m.full_name, m.avatar_url, m.department],
+        );
+        for (const role of m.roles) {
+          await connection.query(
+            "INSERT INTO user_roles (id, user_id, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)",
+            [m.id + "-" + role, m.id, role],
+          );
+        }
+      }
+
+      // Create initial team and add members
+      const teamId = "team-momentum-core";
+      await connection.query(
+        "INSERT INTO teams (id, name, description, lead_id) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name)",
+        [
+          teamId,
+          "Core Momentum Engineering",
+          "Primary engineering team driving core feature development and platform performance.",
+          "alex.rivera",
+        ],
+      );
+
+      for (const m of seedMembers) {
+        if (m.id !== "soheljavadeveloper") {
+          await connection.query(
+            "INSERT INTO team_members (id, team_id, user_id, role) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)",
+            [teamId + "-" + m.id, teamId, m.id, m.roles[0]],
+          );
+        }
+      }
+      console.log("[MySQL Backend] Successfully seeded Super Admin and 4 initial team members.");
+    }
+
     connection.release();
     isInitialized = true;
     console.log("[MySQL Backend] Database tables schema verified and ready!");
