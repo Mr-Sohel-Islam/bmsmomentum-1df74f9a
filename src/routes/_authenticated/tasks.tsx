@@ -1260,9 +1260,10 @@ function TaskModal({
   const [description, setDescription] = useState(task?.description ?? "");
   const [assigneeId, setAssigneeId] = useState(task?.assignee_id ?? "");
   const [teamId, setTeamId] = useState(task?.team_id ?? "");
-  const [epicId, setEpicId] = useState(task?.epic_id ?? "");
-  const [sprintId, setSprintId] = useState(task?.sprint_id ?? "");
-  const [storyId, setStoryId] = useState(task?.story_id ?? "");
+  const [epicId, setEpicId] = useState(task?.epic_id ?? defaults?.epic_id ?? "");
+  const [sprintId, setSprintId] = useState(task?.sprint_id ?? defaults?.sprint_id ?? "");
+  const [storyId, setStoryId] = useState(task?.story_id ?? defaults?.story_id ?? "");
+
   const [status, setStatus] = useState<string>(task?.status ?? "todo");
   const [priority, setPriority] = useState<string>(task?.priority ?? "medium");
   const [points, setPoints] = useState<number>(task?.points ?? 1);
