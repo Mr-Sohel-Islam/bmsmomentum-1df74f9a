@@ -664,6 +664,8 @@ function TasksPage() {
         setOpen={setStoryDialogOpen}
         epics={epics}
         sprints={sprints}
+        stories={stories}
+
         onAdd={(story) => storyMut.mutate(story)}
       />
 
