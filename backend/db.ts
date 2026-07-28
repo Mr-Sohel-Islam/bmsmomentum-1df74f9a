@@ -1,21 +1,20 @@
 import mysql from "mysql2/promise";
+import { env } from "./config/env";
 
-const DEFAULT_MYSQL_URL =
-  process.env.MYSQL_URL ||
-  process.env.DATABASE_URL ||
-  "";
+const DEFAULT_MYSQL_URL = env.MYSQL_URL;
 
 // Parse URL to configure pool safely
 function createPoolConfig(rawUrl: string) {
   try {
     const parsed = new URL(rawUrl);
+    const isLocal = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
     return {
-      host: parsed.hostname,
+      host: parsed.hostname || "localhost",
       port: Number(parsed.port) || 3306,
-      user: parsed.username,
+      user: parsed.username || "root",
       password: decodeURIComponent(parsed.password),
-      database: parsed.pathname.replace(/^\//, "") || "defaultdb",
-      ssl: { rejectUnauthorized: false },
+      database: parsed.pathname.replace(/^\//, "") || "bmsmomentum",
+      ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
@@ -23,7 +22,6 @@ function createPoolConfig(rawUrl: string) {
   } catch {
     return {
       uri: rawUrl,
-      ssl: { rejectUnauthorized: false },
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
