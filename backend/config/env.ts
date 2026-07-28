@@ -1,9 +1,14 @@
 import path from "path";
 import dotenv from "dotenv";
+import { fileURLToPath } from "url";
 
-// Load backend/.env first with override: true so backend/.env takes priority
-dotenv.config({ path: path.resolve(process.cwd(), "backend", ".env"), override: true });
-dotenv.config({ override: false });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load backend .env safely whether running from backend/ or root
+dotenv.config({ path: path.resolve(__dirname, "../.env"), override: true });
+dotenv.config({ path: path.resolve(process.cwd(), "backend/.env"), override: true });
+dotenv.config({ path: path.resolve(process.cwd(), ".env"), override: true });
 
 export const env = {
   NODE_ENV: process.env.NODE_ENV || "development",
