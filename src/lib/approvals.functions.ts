@@ -10,23 +10,49 @@ export const APPROVER_TYPES = [
   "manager_of_requester",
 ] as const;
 
+export const myApprovalAuthority = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [{ data: level }, { data: admin }, { data: superAdmin }] = await Promise.all([
+      context.supabase.rpc("authority_level", { _user_id: context.userId }),
+      context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" }),
+      context.supabase.rpc("has_role", { _user_id: context.userId, _role: "super_admin" }),
+    ]);
+    return {
+      level: (level as number | null) ?? 10,
+      isAdmin: Boolean(admin) || Boolean(superAdmin),
+    };
+  });
+
 export const listWorkflows = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data: workflows, error } = await context.supabase
       .from("approval_workflows")
-      .select("id, name, entity_type, active, created_at")
+      .select("id, name, entity_type, active, created_at, created_by, authority_level")
       .order("created_at");
     if (error) throw new Error(error.message);
     const { data: steps } = await context.supabase
       .from("approval_steps")
       .select("id, workflow_id, step_order, approver_type, approver_ref")
       .order("step_order");
-    return (workflows ?? []).map((w: Record<string, unknown>) => ({
+    const { data: owners } = await context.supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in(
+        "id",
+        Array.from(
+          new Set((workflows ?? []).map((w) => w.created_by).filter((v): v is string => Boolean(v))),
+        ),
+      );
+    const ownerMap = new Map((owners ?? []).map((o) => [o.id, o.full_name]));
+    return (workflows ?? []).map((w) => ({
       ...w,
+      owner_name: w.created_by ? (ownerMap.get(w.created_by) ?? null) : null,
       steps: (steps ?? []).filter((s: Record<string, unknown>) => s.workflow_id === w.id),
     }));
   });
+
 
 export const createWorkflow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

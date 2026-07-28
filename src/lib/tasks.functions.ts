@@ -38,6 +38,9 @@ export const listAssignableUsers = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+export const ESTIMATE_UNITS = ["hours", "days"] as const;
+export type EstimateUnit = (typeof ESTIMATE_UNITS)[number];
+
 const taskInput = z.object({
   title: z.string().min(1).max(160),
   description: z.string().max(2000).optional().nullable(),
@@ -49,7 +52,10 @@ const taskInput = z.object({
   status: z.enum(TASK_STATUSES).default("todo"),
   priority: z.enum(TASK_PRIORITIES).default("medium"),
   points: z.number().int().min(0).max(1000).default(0),
+  start_date: z.string().optional().nullable(),
   due_date: z.string().optional().nullable(),
+  estimate_value: z.number().min(0).max(10000).optional().nullable(),
+  estimate_unit: z.enum(ESTIMATE_UNITS).default("hours"),
 });
 
 export type TaskInput = z.input<typeof taskInput>;
@@ -66,6 +72,7 @@ export type SprintInput = {
   start_date?: string | null;
   end_date?: string | null;
   status?: "planning" | "active" | "completed";
+  total_points?: number;
 };
 export type StoryInput = {
   title: string;
@@ -75,6 +82,7 @@ export type StoryInput = {
   points?: number;
   status?: "backlog" | "in_progress" | "review" | "done";
 };
+
 
 
 export const createTask = createServerFn({ method: "POST" })
@@ -95,7 +103,10 @@ export const createTask = createServerFn({ method: "POST" })
         status: data.status,
         priority: data.priority,
         points: data.points,
+        start_date: data.start_date || null,
         due_date: data.due_date || null,
+        estimate_value: data.estimate_value ?? null,
+        estimate_unit: data.estimate_unit,
       })
       .select("*")
       .single();
@@ -107,13 +118,15 @@ export const updateTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => taskInput.partial().extend({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { id, assignee_id, due_date, ...rest } = data;
+    const { id, assignee_id, due_date, start_date, estimate_value, ...rest } = data;
     const { data: row, error } = await context.supabase
       .from("tasks")
       .update({
         ...rest,
         ...(assignee_id ? { assignee_id } : {}),
         ...("due_date" in data ? { due_date: due_date || null } : {}),
+        ...("start_date" in data ? { start_date: start_date || null } : {}),
+        ...("estimate_value" in data ? { estimate_value: estimate_value ?? null } : {}),
         ...(rest.status === "done" ? { completed_at: new Date().toISOString() } : {}),
       })
       .eq("id", id)
@@ -123,6 +136,7 @@ export const updateTask = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return row;
   });
+
 
 export const deleteTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -284,6 +298,7 @@ export const createSprint = createServerFn({ method: "POST" })
         start_date: z.string().optional().nullable(),
         end_date: z.string().optional().nullable(),
         status: z.enum(["planning", "active", "completed"]).default("planning"),
+        total_points: z.number().int().min(0).max(100000).default(0),
       })
       .parse(d),
   )
@@ -296,7 +311,9 @@ export const createSprint = createServerFn({ method: "POST" })
         start_date: data.start_date || null,
         end_date: data.end_date || null,
         status: data.status,
+        total_points: data.total_points,
       })
+
       .select("*")
       .single();
     if (error) throw new Error(error.message);

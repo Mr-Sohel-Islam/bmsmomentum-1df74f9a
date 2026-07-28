@@ -1,0 +1,16 @@
+REVOKE EXECUTE ON FUNCTION public.notify_user(uuid, text, text, text, text, text, uuid, uuid) FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.notify_task_change() FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.notify_task_comment() FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.notify_appreciation() FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.notify_approval_request() FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.notify_performance_share() FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.protect_workflow_authority() FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.protect_step_authority() FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.authority_level(uuid) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.has_role(uuid, app_role) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.has_permission(uuid, text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.is_manager_of(uuid, uuid) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.is_reserved_super_admin(uuid) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.can_approve_request(uuid, uuid) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.decide_approval(uuid, text, text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.open_approval_request(text, uuid, uuid) FROM anon, authenticated;

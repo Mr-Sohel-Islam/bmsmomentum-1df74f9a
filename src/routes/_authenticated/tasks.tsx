@@ -138,6 +138,8 @@ function TasksPage() {
   const bulkDeleteFn = useServerFn(bulkDeleteTasks);
 
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [prefillStory, setPrefillStory] = useState<Story | null>(null);
+
 
   const toggleTaskSelection = (id: string) => {
     setSelectedTaskIds((prev) =>
@@ -616,7 +618,13 @@ function TasksPage() {
             epics={epics}
             sprints={sprints}
             tasks={tasks as Task[]}
+            onAddTask={(story) => {
+              setEditingTask(null);
+              setPrefillStory(story);
+              setTaskDialogOpen(true);
+            }}
           />
+
         </TabsContent>
 
         {/* Analytics & Sprint Burndown View */}
@@ -627,14 +635,28 @@ function TasksPage() {
 
       {/* Task Creation & Edit Modal */}
       <TaskModal
+        key={editingTask?.id ?? prefillStory?.id ?? "new"}
         open={taskDialogOpen}
-        setOpen={setTaskDialogOpen}
+        setOpen={(o) => {
+          setTaskDialogOpen(o);
+          if (!o) setPrefillStory(null);
+        }}
         task={editingTask}
+        defaults={
+          prefillStory
+            ? {
+                story_id: prefillStory.id,
+                epic_id: prefillStory.epic_id,
+                sprint_id: prefillStory.sprint_id,
+              }
+            : null
+        }
         users={users}
         teams={teams}
         epics={epics}
         sprints={sprints}
         stories={stories}
+
         onSubmit={(vals) => {
           if (editingTask) {
             updateMut.mutate({ id: editingTask.id, ...vals });
@@ -664,6 +686,8 @@ function TasksPage() {
         setOpen={setStoryDialogOpen}
         epics={epics}
         sprints={sprints}
+        stories={stories}
+
         onAdd={(story) => storyMut.mutate(story)}
       />
 
@@ -1144,11 +1168,13 @@ function StoriesManager({
   epics,
   sprints,
   tasks,
+  onAddTask,
 }: {
   stories: Story[];
   epics: Epic[];
   sprints: Sprint[];
   tasks: Task[];
+  onAddTask?: (story: Story) => void;
 }) {
   const epicMap = new Map(epics.map((e) => [e.id, e.title]));
   const sprintMap = new Map(sprints.map((s) => [s.id, s.name]));
@@ -1166,8 +1192,21 @@ function StoriesManager({
                 </span>
                 <h3 className="text-base font-bold text-foreground">{story.title}</h3>
               </div>
-              <Badge variant="secondary">{story.points} pts</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{story.points} pts</Badge>
+                {onAddTask && (
+                  <Button size="sm" variant="outline" onClick={() => onAddTask(story)}>
+                    + Task
+                  </Button>
+                )}
+              </div>
             </div>
+
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              {storyTasks.length} task{storyTasks.length === 1 ? "" : "s"} ·{" "}
+              {storyTasks.filter((t) => t.status === "done").length} done
+            </p>
+
 
             <p className="text-xs text-muted-foreground">
               {story.description || "No story description."}
@@ -1197,6 +1236,7 @@ function TaskModal({
   open,
   setOpen,
   task,
+  defaults,
   users,
   teams,
   epics,
@@ -1207,7 +1247,9 @@ function TaskModal({
   open: boolean;
   setOpen: (o: boolean) => void;
   task: Task | null;
+  defaults?: { story_id?: string | null; epic_id?: string | null; sprint_id?: string | null } | null;
   users: UserOption[];
+
   teams: Team[];
   epics: Epic[];
   sprints: Sprint[];
@@ -1218,13 +1260,33 @@ function TaskModal({
   const [description, setDescription] = useState(task?.description ?? "");
   const [assigneeId, setAssigneeId] = useState(task?.assignee_id ?? "");
   const [teamId, setTeamId] = useState(task?.team_id ?? "");
-  const [epicId, setEpicId] = useState(task?.epic_id ?? "");
-  const [sprintId, setSprintId] = useState(task?.sprint_id ?? "");
-  const [storyId, setStoryId] = useState(task?.story_id ?? "");
+  const [epicId, setEpicId] = useState(task?.epic_id ?? defaults?.epic_id ?? "");
+  const [sprintId, setSprintId] = useState(task?.sprint_id ?? defaults?.sprint_id ?? "");
+  const [storyId, setStoryId] = useState(task?.story_id ?? defaults?.story_id ?? "");
+
   const [status, setStatus] = useState<string>(task?.status ?? "todo");
   const [priority, setPriority] = useState<string>(task?.priority ?? "medium");
   const [points, setPoints] = useState<number>(task?.points ?? 1);
   const [dueDate, setDueDate] = useState<string>(task?.due_date ?? "");
+  const [startDate, setStartDate] = useState<string>(
+    (task as { start_date?: string | null } | null)?.start_date ?? "",
+  );
+  const [estimateValue, setEstimateValue] = useState<string>(
+    String((task as { estimate_value?: number | null } | null)?.estimate_value ?? ""),
+  );
+  const [estimateUnit, setEstimateUnit] = useState<string>(
+    (task as { estimate_unit?: string | null } | null)?.estimate_unit ?? "hours",
+  );
+
+  const derivedDays =
+    startDate && dueDate
+      ? Math.max(
+          0,
+          Math.round(
+            (new Date(dueDate).getTime() - new Date(startDate).getTime()) / 86400000,
+          ),
+        )
+      : null;
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1240,9 +1302,13 @@ function TaskModal({
       status: status as TaskInput["status"],
       priority: priority as TaskInput["priority"],
       points,
+      start_date: startDate || null,
       due_date: dueDate || null,
+      estimate_value: estimateValue === "" ? null : Number(estimateValue),
+      estimate_unit: estimateUnit as TaskInput["estimate_unit"],
     });
   };
+
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -1395,6 +1461,53 @@ function TaskModal({
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Start date</Label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Due date</Label>
+              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Estimate</Label>
+              <Input
+                type="number"
+                min={0}
+                step="0.5"
+                placeholder="e.g. 8"
+                value={estimateValue}
+                onChange={(e) => setEstimateValue(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Unit</Label>
+              <select
+                className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs"
+                value={estimateUnit}
+                onChange={(e) => setEstimateUnit(e.target.value)}
+              >
+                <option value="hours">hours</option>
+                <option value="days">days</option>
+              </select>
+            </div>
+          </div>
+          {derivedDays !== null && (
+            <p className="font-mono text-xs text-muted-foreground">
+              Window: {startDate} → {dueDate} ({derivedDays} day{derivedDays === 1 ? "" : "s"})
+            </p>
+          )}
+
+
+
           <DialogFooter className="pt-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
@@ -1465,6 +1578,11 @@ function CreateSprintModal({
 }) {
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [endDate, setEndDate] = useState(
+    new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+  );
+  const [totalPoints, setTotalPoints] = useState(40);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1472,9 +1590,10 @@ function CreateSprintModal({
     onAdd({
       name,
       goal: goal || null,
-      start_date: new Date().toISOString().slice(0, 10),
-      end_date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+      start_date: startDate || null,
+      end_date: endDate || null,
       status: "planning",
+      total_points: totalPoints,
     });
     setName("");
     setGoal("");
@@ -1501,7 +1620,35 @@ function CreateSprintModal({
             <Label>Sprint Goal</Label>
             <Textarea value={goal} onChange={(e) => setGoal(e.target.value)} />
           </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label>Starts</Label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Ends</Label>
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Point budget</Label>
+              <Input
+                type="number"
+                min={0}
+                value={totalPoints}
+                onChange={(e) => setTotalPoints(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            The total point budget is fixed at sprint creation; story and task points are
+            distributed against it.
+          </p>
           <DialogFooter>
+
             <Button type="submit">Create Sprint</Button>
           </DialogFooter>
         </form>
@@ -1516,12 +1663,14 @@ function CreateStoryModal({
   setOpen,
   epics,
   sprints,
+  stories,
   onAdd,
 }: {
   open: boolean;
   setOpen: (o: boolean) => void;
   epics: Epic[];
   sprints: Sprint[];
+  stories: Story[];
   onAdd: (story: StoryInput) => void;
 }) {
   const [title, setTitle] = useState("");
@@ -1529,6 +1678,13 @@ function CreateStoryModal({
   const [epicId, setEpicId] = useState("");
   const [sprintId, setSprintId] = useState("");
   const [points, setPoints] = useState(5);
+
+  const sprint = sprints.find((s) => s.id === sprintId) ?? null;
+  const budget = (sprint as { total_points?: number } | null)?.total_points ?? 0;
+  const allocated = stories
+    .filter((s) => s.sprint_id === sprintId)
+    .reduce((sum, s) => sum + (s.points ?? 0), 0);
+  const remaining = budget - allocated - points;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1561,7 +1717,7 @@ function CreateStoryModal({
             <Label>Description</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label>Epic</Label>
               <select
@@ -1592,7 +1748,45 @@ function CreateStoryModal({
                 ))}
               </select>
             </div>
+            <div className="space-y-1.5">
+              <Label>Points</Label>
+              <Input
+                type="number"
+                min={0}
+                value={points}
+                onChange={(e) => setPoints(Number(e.target.value))}
+              />
+            </div>
           </div>
+
+          {sprintId && (
+            <div className="rounded-md border border-border/60 bg-muted/30 p-3">
+              <div className="flex items-center justify-between font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+                <span>Sprint point distribution</span>
+                <span>
+                  {allocated + points} / {budget || "∞"}
+                </span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={`h-full ${remaining < 0 ? "bg-destructive" : "bg-primary"}`}
+                  style={{
+                    width: budget
+                      ? `${Math.min(100, ((allocated + points) / budget) * 100)}%`
+                      : "0%",
+                  }}
+                />
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {budget === 0
+                  ? "No point budget set for this sprint."
+                  : remaining < 0
+                    ? `Over budget by ${Math.abs(remaining)} pts.`
+                    : `${remaining} pts remaining after this story.`}
+              </p>
+            </div>
+          )}
+
           <DialogFooter>
             <Button type="submit">Create Story</Button>
           </DialogFooter>
