@@ -1420,6 +1420,53 @@ function TaskModal({
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Start date</Label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Due date</Label>
+              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Estimate</Label>
+              <Input
+                type="number"
+                min={0}
+                step="0.5"
+                placeholder="e.g. 8"
+                value={estimateValue}
+                onChange={(e) => setEstimateValue(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Unit</Label>
+              <select
+                className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs"
+                value={estimateUnit}
+                onChange={(e) => setEstimateUnit(e.target.value)}
+              >
+                <option value="hours">hours</option>
+                <option value="days">days</option>
+              </select>
+            </div>
+          </div>
+          {derivedDays !== null && (
+            <p className="font-mono text-xs text-muted-foreground">
+              Window: {startDate} → {dueDate} ({derivedDays} day{derivedDays === 1 ? "" : "s"})
+            </p>
+          )}
+
+
+
           <DialogFooter className="pt-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
