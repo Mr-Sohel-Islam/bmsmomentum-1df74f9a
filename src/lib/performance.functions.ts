@@ -140,3 +140,202 @@ export const leaderboard = createServerFn({ method: "GET" })
       .sort((a, b) => b.points - a.points)
       .slice(0, 20);
   });
+
+// ---------- Delivery performance (epics / stories / tasks) ----------
+export type DeliveryPeriod = {
+  period: string;
+  credited: number;
+  pending: number;
+  tasks: number;
+};
+
+export type DeliverySummary = {
+  periods: DeliveryPeriod[];
+  totals: {
+    creditedPoints: number;
+    pendingPoints: number;
+    tasksDone: number;
+    tasksPending: number;
+    tasksOpen: number;
+    storiesCompleted: number;
+    epicsCompleted: number;
+  };
+  recent: {
+    id: string;
+    title: string;
+    points: number;
+    approval_status: string;
+    completed_at: string | null;
+  }[];
+};
+
+export const myDelivery = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<DeliverySummary> => {
+    const { data: tasks, error } = await context.supabase
+      .from("tasks")
+      .select("id, title, points, status, approval_status, completed_at, story_id, epic_id")
+      .eq("assignee_id", context.userId);
+    if (error) throw new Error(error.message);
+    const rows = tasks ?? [];
+
+    const done = rows.filter((t) => t.status === "done");
+    const credited = done.filter(
+      (t) => t.approval_status === "approved" || t.approval_status === "not_required",
+    );
+    const pending = done.filter((t) => t.approval_status === "pending");
+
+    const byPeriod = new Map<string, DeliveryPeriod>();
+    for (const t of done) {
+      const period = (t.completed_at ?? new Date().toISOString()).slice(0, 7);
+      const entry = byPeriod.get(period) ?? { period, credited: 0, pending: 0, tasks: 0 };
+      if (t.approval_status === "pending") entry.pending += t.points;
+      else if (t.approval_status !== "rejected") entry.credited += t.points;
+      entry.tasks += 1;
+      byPeriod.set(period, entry);
+    }
+
+    const storyIds = Array.from(
+      new Set(rows.map((t) => t.story_id).filter((v): v is string => Boolean(v))),
+    );
+    const epicIds = Array.from(
+      new Set(rows.map((t) => t.epic_id).filter((v): v is string => Boolean(v))),
+    );
+
+    let storiesCompleted = 0;
+    if (storyIds.length) {
+      const { data } = await context.supabase
+        .from("stories")
+        .select("id")
+        .in("id", storyIds)
+        .eq("status", "done");
+      storiesCompleted = (data ?? []).length;
+    }
+    let epicsCompleted = 0;
+    if (epicIds.length) {
+      const { data } = await context.supabase
+        .from("epics")
+        .select("id")
+        .in("id", epicIds)
+        .eq("status", "completed");
+      epicsCompleted = (data ?? []).length;
+    }
+
+    return {
+      periods: Array.from(byPeriod.values()).sort((a, b) => a.period.localeCompare(b.period)),
+      totals: {
+        creditedPoints: credited.reduce((s, t) => s + t.points, 0),
+        pendingPoints: pending.reduce((s, t) => s + t.points, 0),
+        tasksDone: credited.length,
+        tasksPending: pending.length,
+        tasksOpen: rows.length - done.length,
+        storiesCompleted,
+        epicsCompleted,
+      },
+      recent: done
+        .slice()
+        .sort((a, b) => (b.completed_at ?? "").localeCompare(a.completed_at ?? ""))
+        .slice(0, 8)
+        .map((t) => ({
+          id: t.id,
+          title: t.title,
+          points: t.points,
+          approval_status: t.approval_status,
+          completed_at: t.completed_at,
+        })),
+    };
+  });
+
+// ---------- Sharing performance ----------
+export const listShareTargets = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [{ data: profiles }, { data: me }] = await Promise.all([
+      context.supabase
+        .from("profiles")
+        .select("id, full_name, department, position_id")
+        .eq("is_active", true)
+        .order("full_name"),
+      context.supabase.from("profiles").select("manager_id").eq("id", context.userId).maybeSingle(),
+    ]);
+    const { data: roles } = await context.supabase.from("user_roles").select("user_id, role");
+    const roleMap = new Map<string, string[]>();
+    for (const r of roles ?? []) {
+      roleMap.set(r.user_id, [...(roleMap.get(r.user_id) ?? []), r.role as string]);
+    }
+    return (profiles ?? [])
+      .filter((p) => p.id !== context.userId)
+      .map((p) => ({
+        id: p.id,
+        full_name: p.full_name,
+        department: p.department,
+        roles: roleMap.get(p.id) ?? [],
+        is_my_manager: me?.manager_id === p.id,
+      }));
+  });
+
+export const sharePerformance = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        recipients: z.array(z.string().uuid()).min(1).max(25),
+        period: z.string().min(1).max(20),
+        note: z.string().max(1000).optional().nullable(),
+        snapshot: z.record(z.string(), z.unknown()).default({}),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const rows = data.recipients.map((r) => ({
+      owner_id: context.userId,
+      shared_with: r,
+      period: data.period,
+      note: data.note || null,
+      snapshot: data.snapshot as never,
+    }));
+    const { error } = await context.supabase
+      .from("performance_shares")
+      .upsert(rows, { onConflict: "owner_id,shared_with,period" });
+    if (error) throw new Error(error.message);
+    return { count: rows.length };
+  });
+
+export const listSharedWithMe = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("performance_shares")
+      .select("id, owner_id, period, note, snapshot, created_at")
+      .eq("shared_with", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+    const ids = Array.from(new Set((data ?? []).map((s) => s.owner_id)));
+    if (ids.length === 0) return [];
+    const { data: profs } = await context.supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", ids);
+    const map = new Map((profs ?? []).map((p) => [p.id, p.full_name]));
+    return (data ?? []).map((s) => ({ ...s, owner_name: map.get(s.owner_id) ?? "Colleague" }));
+  });
+
+export const listMyShares = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("performance_shares")
+      .select("id, shared_with, period, created_at")
+      .eq("owner_id", context.userId)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    const ids = Array.from(new Set((data ?? []).map((s) => s.shared_with)));
+    if (ids.length === 0) return [];
+    const { data: profs } = await context.supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", ids);
+    const map = new Map((profs ?? []).map((p) => [p.id, p.full_name]));
+    return (data ?? []).map((s) => ({ ...s, recipient_name: map.get(s.shared_with) ?? "User" }));
+  });
