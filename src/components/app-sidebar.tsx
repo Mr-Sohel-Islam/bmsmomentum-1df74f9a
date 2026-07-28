@@ -108,7 +108,11 @@ export function AppSidebar() {
             <SidebarMenu>
               {admin.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={pathname.startsWith(item.url)}>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={item.title}
+                    isActive={pathname.startsWith(item.url)}
+                  >
                     <Link to={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
@@ -118,12 +122,13 @@ export function AppSidebar() {
               ))}
               {soon.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton disabled className="opacity-50">
+                  <SidebarMenuButton disabled tooltip={item.title} className="opacity-50">
                     <item.icon />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
