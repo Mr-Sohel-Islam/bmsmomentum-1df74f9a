@@ -1146,11 +1146,13 @@ function StoriesManager({
   epics,
   sprints,
   tasks,
+  onAddTask,
 }: {
   stories: Story[];
   epics: Epic[];
   sprints: Sprint[];
   tasks: Task[];
+  onAddTask?: (story: Story) => void;
 }) {
   const epicMap = new Map(epics.map((e) => [e.id, e.title]));
   const sprintMap = new Map(sprints.map((s) => [s.id, s.name]));
@@ -1168,8 +1170,21 @@ function StoriesManager({
                 </span>
                 <h3 className="text-base font-bold text-foreground">{story.title}</h3>
               </div>
-              <Badge variant="secondary">{story.points} pts</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{story.points} pts</Badge>
+                {onAddTask && (
+                  <Button size="sm" variant="outline" onClick={() => onAddTask(story)}>
+                    + Task
+                  </Button>
+                )}
+              </div>
             </div>
+
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              {storyTasks.length} task{storyTasks.length === 1 ? "" : "s"} ·{" "}
+              {storyTasks.filter((t) => t.status === "done").length} done
+            </p>
+
 
             <p className="text-xs text-muted-foreground">
               {story.description || "No story description."}
