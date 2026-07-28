@@ -1,5 +1,5 @@
 import mysql from "mysql2/promise";
-import { env } from "./config/env";
+import { env } from "./config/env.js";
 
 const DEFAULT_MYSQL_URL = env.MYSQL_URL;
 
