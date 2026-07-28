@@ -1,13 +1,20 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
+  BellOff,
   CheckCheck,
   Trash2,
   CheckCircle2,
   MessageSquare,
   UserPlus,
+  ShieldCheck,
   Sparkles,
+  TrendingUp,
+  Volume2,
+  VolumeX,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,164 +30,176 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { isSoundEnabled, setSoundEnabled, playNotificationSound } from "@/lib/notification-sound";
 
 export interface NotificationItem {
   id: string;
-  type: "assignment" | "mention" | "status_change";
+  user_id: string;
+  type: string;
   title: string;
   message: string;
-  timestamp: string;
+  link: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  actor_id: string | null;
   read: boolean;
-  taskId?: string;
-  teamName?: string;
-  authorName?: string;
+  created_at: string;
 }
 
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "notif-1",
-    type: "assignment",
-    title: "New Task Assignment",
-    message: "Sarah Connor assigned you to 'Implement OAuth 2.0 PKCE Flow'",
-    timestamp: "10 mins ago",
-    read: false,
-    taskId: "task-1",
-    authorName: "Sarah Connor",
-  },
-  {
-    id: "notif-2",
-    type: "mention",
-    title: "Mentioned in Comment",
-    message: "Alex Rivera mentioned you: '@admin please review the API specs for team metrics'",
-    timestamp: "1 hour ago",
-    read: false,
-    taskId: "task-2",
-    authorName: "Alex Rivera",
-  },
-  {
-    id: "notif-3",
-    type: "status_change",
-    title: "Task Status Updated",
-    message: "Core Platform Team: 'Database Index Optimization' changed status to Completed",
-    timestamp: "2 hours ago",
-    read: true,
-    teamName: "Core Platform",
-    authorName: "Database Bot",
-  },
-  {
-    id: "notif-4",
-    type: "assignment",
-    title: "Task Reassigned",
-    message: "You were assigned to 'Setup CI/CD Pipeline for Docker Deployments'",
-    timestamp: "Yesterday",
-    read: true,
-    taskId: "task-3",
-    authorName: "DevOps Team",
-  },
-];
+type Filter = "all" | "unread" | "assignment" | "approval" | "mention";
+
+const TYPE_META: Record<string, { icon: typeof Bell; className: string }> = {
+  assignment: { icon: UserPlus, className: "bg-blue-500/10 text-blue-500" },
+  mention: { icon: MessageSquare, className: "bg-purple-500/10 text-purple-500" },
+  status_change: { icon: CheckCircle2, className: "bg-emerald-500/10 text-emerald-500" },
+  approval: { icon: ShieldCheck, className: "bg-amber-500/10 text-amber-500" },
+  appreciation: { icon: Sparkles, className: "bg-pink-500/10 text-pink-500" },
+  performance: { icon: TrendingUp, className: "bg-primary/10 text-primary" },
+};
+
+function relativeTime(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
 
 export function NotificationCenter() {
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
-  const [filter, setFilter] = useState<
-    "all" | "unread" | "assignment" | "mention" | "status_change"
-  >("all");
-  const [isOpen, setIsOpen] = useState(false);
+  const qc = useQueryClient();
   const navigate = useNavigate();
+  const [filter, setFilter] = useState<Filter>("all");
+  const [isOpen, setIsOpen] = useState(false);
+  const [soundOn, setSoundOn] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  const seenIds = useRef<Set<string>>(new Set());
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  // Setup real-time listener for tasks & team events
   useEffect(() => {
-    const channel = supabase
-      .channel("realtime-team-activity")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
-        const newNotif: NotificationItem = {
-          id: `notif-${Date.now()}`,
-          type: "status_change",
-          title: "Real-time Task Update",
-          message: `Task status updated in real-time by team member.`,
-          timestamp: "Just now",
-          read: false,
-        };
+    setSoundOn(isSoundEnabled());
+    void supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+  }, []);
 
-        setNotifications((prev) => [newNotif, ...prev]);
-        toast.info(newNotif.title, {
-          description: newNotif.message,
-          icon: <Bell className="h-4 w-4 text-primary" />,
-        });
-      })
+  const { data: notifications = [], isLoading } = useQuery({
+    queryKey: ["notifications", userId],
+    enabled: Boolean(userId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as NotificationItem[];
+    },
+  });
+
+  // Seed the "already seen" set so the first load never plays a burst of sounds.
+  useEffect(() => {
+    if (notifications.length && seenIds.current.size === 0) {
+      notifications.forEach((n) => seenIds.current.add(n.id));
+    }
+  }, [notifications]);
+
+  const refetch = useCallback(() => {
+    void qc.invalidateQueries({ queryKey: ["notifications"] });
+  }, [qc]);
+
+  // Live feed scoped to this user's own rows.
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`notifications:${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const n = payload.new as NotificationItem;
+          if (seenIds.current.has(n.id)) return;
+          seenIds.current.add(n.id);
+          playNotificationSound(n.type === "approval" ? "urgent" : "default");
+          toast(n.title, {
+            description: n.message,
+            icon: <Bell className="h-4 w-4 text-primary" />,
+            action: n.link
+              ? { label: "Open", onClick: () => navigate({ to: n.link as string }) }
+              : undefined,
+          });
+          refetch();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+        refetch,
+      )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [userId, navigate, refetch]);
 
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    toast.success("All notifications marked as read");
-  };
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 
-  const clearAll = () => {
-    setNotifications([]);
-    toast.success("Cleared all notifications");
-  };
+  const filtered = useMemo(
+    () =>
+      notifications.filter((n) => {
+        if (filter === "unread") return !n.read;
+        if (filter === "all") return true;
+        if (filter === "mention") return n.type === "mention" || n.type === "appreciation";
+        return n.type === filter;
+      }),
+    [notifications, filter],
+  );
 
-  const toggleRead = (id: string, e: React.MouseEvent) => {
+  async function markAllRead() {
+    if (!userId || unreadCount === 0) return;
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read: true })
+      .eq("user_id", userId)
+      .eq("read", false);
+    if (error) return toast.error(error.message);
+    refetch();
+  }
+
+  async function clearAll() {
+    if (!userId || notifications.length === 0) return;
+    const { error } = await supabase.from("notifications").delete().eq("user_id", userId);
+    if (error) return toast.error(error.message);
+    toast.success("Notifications cleared");
+    refetch();
+  }
+
+  async function toggleRead(n: NotificationItem, e: React.MouseEvent) {
     e.stopPropagation();
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: !n.read } : n)));
-  };
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read: !n.read })
+      .eq("id", n.id);
+    if (error) return toast.error(error.message);
+    refetch();
+  }
 
-  const handleNotificationClick = (notif: NotificationItem) => {
-    setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)));
-    setIsOpen(false);
-    navigate({ to: "/tasks" });
-  };
-
-  // Quick Action: Simulate an incoming alert
-  const simulateIncomingAlert = () => {
-    const types: ("assignment" | "mention" | "status_change")[] = [
-      "assignment",
-      "mention",
-      "status_change",
-    ];
-    const chosenType = types[Math.floor(Math.random() * types.length)];
-
-    let alertTitle = "New Alert";
-    let alertMsg = "An update occurred in your workspace.";
-
-    if (chosenType === "assignment") {
-      alertTitle = "Task Assigned";
-      alertMsg = "You were assigned to 'Security Audit & RBAC Validation'";
-    } else if (chosenType === "mention") {
-      alertTitle = "Mentioned in Discussion";
-      alertMsg = "Taylor Reed mentioned you: '@admin can you approve PR #104?'";
-    } else {
-      alertTitle = "Status Changed";
-      alertMsg = "Frontend Team: Task 'Burn-down Recharts Widget' moved to Done";
+  async function open(n: NotificationItem) {
+    if (!n.read) {
+      await supabase.from("notifications").update({ read: true }).eq("id", n.id);
+      refetch();
     }
+    setIsOpen(false);
+    if (n.link) navigate({ to: n.link });
+  }
 
-    const simulated: NotificationItem = {
-      id: `sim-${Date.now()}`,
-      type: chosenType,
-      title: alertTitle,
-      message: alertMsg,
-      timestamp: "Just now",
-      read: false,
-      authorName: "System Realtime",
-    };
-
-    setNotifications((prev) => [simulated, ...prev]);
-    toast.success(`⚡ Real-time Alert: ${alertTitle}`, {
-      description: alertMsg,
-    });
-  };
-
-  const filteredNotifications = notifications.filter((n) => {
-    if (filter === "unread") return !n.read;
-    if (filter !== "all") return n.type === filter;
-    return true;
-  });
+  function toggleSound() {
+    const next = !soundOn;
+    setSoundOn(next);
+    setSoundEnabled(next);
+    if (next) playNotificationSound();
+  }
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -188,57 +207,54 @@ export function NotificationCenter() {
         <Button
           variant="outline"
           size="icon"
+          aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
           className="relative h-8.5 w-8.5 rounded-lg border-border/80 bg-background/80 shadow-xs hover:text-foreground"
         >
           <Bell className="h-4 w-4 text-foreground/80" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground animate-pulse">
-              {unreadCount}
+            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+              {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
         </Button>
       </SheetTrigger>
 
-      <SheetContent className="w-full sm:max-w-md p-0 flex flex-col h-full bg-card border-l border-border">
-        {/* Header */}
-        <SheetHeader className="p-4 pb-3 border-b border-border space-y-2">
+      <SheetContent className="flex h-full w-full flex-col border-l border-border bg-card p-0 sm:max-w-md">
+        <SheetHeader className="space-y-2 border-b border-border p-4 pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <SheetTitle className="text-base font-bold flex items-center gap-2">
+              <SheetTitle className="flex items-center gap-2 text-base font-bold">
                 <Bell className="h-4 w-4 text-primary" /> Notifications
               </SheetTitle>
               {unreadCount > 0 && (
-                <Badge variant="default" className="text-[10px] px-2 py-0.5">
+                <Badge variant="default" className="px-2 py-0.5 text-[10px]">
                   {unreadCount} new
                 </Badge>
               )}
             </div>
 
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={simulateIncomingAlert}
-                className="h-7 text-[11px] text-muted-foreground hover:text-primary gap-1 px-2"
-                title="Simulate incoming real-time notification"
-              >
-                <Sparkles className="h-3 w-3 text-amber-500" />
-                <span className="hidden sm:inline">Test Alert</span>
-              </Button>
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleSound}
+              className="h-7 gap-1 px-2 text-[11px] text-muted-foreground hover:text-primary"
+              title={soundOn ? "Mute alert sound" : "Enable alert sound"}
+            >
+              {soundOn ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">{soundOn ? "Sound on" : "Muted"}</span>
+            </Button>
           </div>
           <SheetDescription className="text-xs text-muted-foreground">
-            Real-time updates for assignments, mentions, and team status updates.
+            Live alerts for assignments, comments, approvals, appreciation and shared reports.
           </SheetDescription>
 
-          {/* Quick Action Buttons */}
           <div className="flex items-center justify-between pt-1">
             <Button
               variant="outline"
               size="sm"
-              onClick={markAllAsRead}
+              onClick={markAllRead}
               disabled={unreadCount === 0}
-              className="h-7 text-[11px] gap-1 px-2 text-muted-foreground"
+              className="h-7 gap-1 px-2 text-[11px] text-muted-foreground"
             >
               <CheckCheck className="h-3 w-3" /> Mark all read
             </Button>
@@ -248,117 +264,102 @@ export function NotificationCenter() {
               size="sm"
               onClick={clearAll}
               disabled={notifications.length === 0}
-              className="h-7 text-[11px] gap-1 px-2 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
+              className="h-7 gap-1 px-2 text-[11px] text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
             >
               <Trash2 className="h-3 w-3" /> Clear list
             </Button>
           </div>
         </SheetHeader>
 
-        {/* Filter Tabs */}
-        <div className="px-4 py-2 border-b border-border/60 bg-muted/20">
-          <Tabs
-            value={filter}
-            onValueChange={(v) =>
-              setFilter(v as "all" | "unread" | "assignment" | "mention" | "status_change")
-            }
-          >
-            <TabsList className="grid w-full grid-cols-5 text-[10px] h-7 p-0.5">
-              <TabsTrigger value="all" className="text-[10px] py-0.5 px-1">
+        <div className="border-b border-border/60 bg-muted/20 px-4 py-2">
+          <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
+            <TabsList className="grid h-7 w-full grid-cols-4 p-0.5 text-[10px]">
+              <TabsTrigger value="all" className="px-1 py-0.5 text-[10px]">
                 All ({notifications.length})
               </TabsTrigger>
-              <TabsTrigger value="unread" className="text-[10px] py-0.5 px-1">
+              <TabsTrigger value="unread" className="px-1 py-0.5 text-[10px]">
                 Unread ({unreadCount})
               </TabsTrigger>
-              <TabsTrigger value="assignment" className="text-[10px] py-0.5 px-1">
-                Assigned
+              <TabsTrigger value="assignment" className="px-1 py-0.5 text-[10px]">
+                Tasks
               </TabsTrigger>
-              <TabsTrigger value="mention" className="text-[10px] py-0.5 px-1">
-                Mentions
-              </TabsTrigger>
-              <TabsTrigger value="status_change" className="text-[10px] py-0.5 px-1">
-                Status
+              <TabsTrigger value="approval" className="px-1 py-0.5 text-[10px]">
+                Approvals
               </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
 
-        {/* Notifications Scroll List */}
         <ScrollArea className="flex-1 px-4 py-3">
-          {filteredNotifications.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground space-y-2">
-              <Bell className="h-8 w-8 mx-auto stroke-1 text-muted-foreground/50" />
+          {isLoading ? (
+            <div className="grid place-items-center py-12">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="space-y-2 py-12 text-center text-muted-foreground">
+              <BellOff className="mx-auto h-8 w-8 stroke-1 text-muted-foreground/50" />
               <p className="text-sm font-medium">No notifications</p>
               <p className="text-xs text-muted-foreground/80">
-                You're all caught up! Real-time alerts will appear here.
+                You're all caught up — new activity lands here instantly.
               </p>
             </div>
           ) : (
             <div className="space-y-2.5">
-              {filteredNotifications.map((notif) => (
-                <div
-                  key={notif.id}
-                  onClick={() => handleNotificationClick(notif)}
-                  className={`group relative flex items-start gap-3 rounded-lg border p-3 transition-all cursor-pointer ${
-                    notif.read
-                      ? "border-border/50 bg-card/60 opacity-80 hover:bg-card hover:opacity-100"
-                      : "border-primary/40 bg-primary/5 shadow-2xs hover:bg-primary/10"
-                  }`}
-                >
-                  {/* Icon Indicator */}
-                  <div className="mt-0.5 shrink-0">
-                    {notif.type === "assignment" && (
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
-                        <UserPlus className="h-3.5 w-3.5" />
-                      </div>
-                    )}
-                    {notif.type === "mention" && (
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-500/10 text-purple-500">
-                        <MessageSquare className="h-3.5 w-3.5" />
-                      </div>
-                    )}
-                    {notif.type === "status_change" && (
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Notification Content */}
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-xs text-foreground truncate">
-                        {notif.title}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground shrink-0 font-mono">
-                        {notif.timestamp}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-muted-foreground leading-snug line-clamp-2">
-                      {notif.message}
-                    </p>
-
-                    <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground">
-                      <span className="truncate">
-                        {notif.authorName && `By ${notif.authorName}`}
-                      </span>
-
-                      <button
-                        onClick={(e) => toggleRead(notif.id, e)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground underline"
+              {filtered.map((n) => {
+                const meta = TYPE_META[n.type] ?? {
+                  icon: Bell,
+                  className: "bg-muted text-muted-foreground",
+                };
+                const Icon = meta.icon;
+                return (
+                  <div
+                    key={n.id}
+                    onClick={() => void open(n)}
+                    className={`group relative flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-all ${
+                      n.read
+                        ? "border-border/50 bg-card/60 opacity-80 hover:bg-card hover:opacity-100"
+                        : "border-primary/40 bg-primary/5 shadow-2xs hover:bg-primary/10"
+                    }`}
+                  >
+                    <div className="mt-0.5 shrink-0">
+                      <div
+                        className={`flex h-7 w-7 items-center justify-center rounded-full ${meta.className}`}
                       >
-                        {notif.read ? "Mark unread" : "Mark read"}
-                      </button>
+                        <Icon className="h-3.5 w-3.5" />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Unread indicator dot */}
-                  {!notif.read && (
-                    <span className="absolute top-3 right-3 h-2 w-2 rounded-full bg-primary" />
-                  )}
-                </div>
-              ))}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-xs font-semibold text-foreground">
+                          {n.title}
+                        </span>
+                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                          {relativeTime(n.created_at)}
+                        </span>
+                      </div>
+
+                      <p className="line-clamp-3 text-xs leading-snug text-muted-foreground">
+                        {n.message}
+                      </p>
+
+                      <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground">
+                        <span className="truncate capitalize">{n.type.replace("_", " ")}</span>
+                        <button
+                          onClick={(e) => void toggleRead(n, e)}
+                          className="underline opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                        >
+                          {n.read ? "Mark unread" : "Mark read"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {!n.read && (
+                      <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-primary" />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </ScrollArea>
