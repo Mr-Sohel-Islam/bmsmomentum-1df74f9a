@@ -17,7 +17,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { apiClient } from "@/lib/api-client";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -80,14 +80,20 @@ export function NotificationCenter() {
 
   useEffect(() => {
     setSoundOn(isSoundEnabled());
-    apiClient.get<any>("/auth/me").then((data) => setUserId(data?.user?.id ?? "active-user")).catch(() => setUserId("active-user"));
+    void supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
   }, []);
 
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ["notifications", userId],
     enabled: Boolean(userId),
     queryFn: async () => {
-      return [] as NotificationItem[];
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as NotificationItem[];
     },
   });
 
@@ -101,6 +107,41 @@ export function NotificationCenter() {
   const refetch = useCallback(() => {
     void qc.invalidateQueries({ queryKey: ["notifications"] });
   }, [qc]);
+
+  // Live feed scoped to this user's own rows.
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`notifications:${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const n = payload.new as NotificationItem;
+          if (seenIds.current.has(n.id)) return;
+          seenIds.current.add(n.id);
+          playNotificationSound(n.type === "approval" ? "urgent" : "default");
+          toast(n.title, {
+            description: n.message,
+            icon: <Bell className="h-4 w-4 text-primary" />,
+            action: n.link
+              ? { label: "Open", onClick: () => navigate({ to: n.link as string }) }
+              : undefined,
+          });
+          refetch();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+        refetch,
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, navigate, refetch]);
 
   const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 
@@ -116,20 +157,39 @@ export function NotificationCenter() {
   );
 
   async function markAllRead() {
+    if (!userId || unreadCount === 0) return;
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read: true })
+      .eq("user_id", userId)
+      .eq("read", false);
+    if (error) return toast.error(error.message);
     refetch();
   }
 
   async function clearAll() {
+    if (!userId || notifications.length === 0) return;
+    const { error } = await supabase.from("notifications").delete().eq("user_id", userId);
+    if (error) return toast.error(error.message);
     toast.success("Notifications cleared");
     refetch();
   }
 
   async function toggleRead(n: NotificationItem, e: React.MouseEvent) {
     e.stopPropagation();
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read: !n.read })
+      .eq("id", n.id);
+    if (error) return toast.error(error.message);
     refetch();
   }
 
   async function open(n: NotificationItem) {
+    if (!n.read) {
+      await supabase.from("notifications").update({ read: true }).eq("id", n.id);
+      refetch();
+    }
     setIsOpen(false);
     if (n.link) navigate({ to: n.link });
   }

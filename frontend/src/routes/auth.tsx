@@ -1,11 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Activity, Loader2, Lock } from "lucide-react";
-import { apiClient, setAuthToken, getAuthToken } from "@/lib/api-client";
+import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { bootstrapSuperAdmin } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -19,34 +21,40 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+const SUPER_ADMIN_EMAIL = "soheljavadeveloper@gmail.com";
+const SUPER_ADMIN_PASSWORD = "Sohel@34892";
+
 function AuthPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const bootstrap = useServerFn(bootstrapSuperAdmin);
 
   useEffect(() => {
-    const token = getAuthToken();
-    if (token) {
-      navigate({ to: "/dashboard" });
-    }
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) navigate({ to: "/dashboard" });
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session) navigate({ to: "/dashboard" });
+    });
+    return () => sub.subscription.unsubscribe();
   }, [navigate]);
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await apiClient.post<{ token: string; user: any }>("/auth/login", {
-        email,
-        password,
-      });
-      if (res.token) {
-        setAuthToken(res.token);
-        toast.success("Signed in successfully");
-        navigate({ to: "/dashboard" });
-      } else {
-        throw new Error("No auth token returned from server");
+      // If reserved super admin — ensure the account exists first (idempotent)
+      if (email.trim().toLowerCase() === SUPER_ADMIN_EMAIL) {
+        try {
+          await bootstrap({ data: { email: SUPER_ADMIN_EMAIL, password: SUPER_ADMIN_PASSWORD } });
+        } catch {
+          /* ignore — account probably exists */
+        }
       }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign-in failed");
     } finally {

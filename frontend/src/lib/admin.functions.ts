@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { apiClient } from "./api-client";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const PERMISSIONS = [
   "onboard_users",
@@ -16,10 +17,48 @@ export type Permission = (typeof PERMISSIONS)[number];
 export const ROLES = ["super_admin", "admin", "manager", "member"] as const;
 export type Role = (typeof ROLES)[number];
 
+async function assertAdmin(context: { supabase: SupabaseClient; userId: string }) {
+  const { data, error } = await context.supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", context.userId);
+  if (error) throw new Error(error.message);
+  const roles = (data ?? []).map((r: { role: string }) => r.role);
+  if (!roles.includes("admin") && !roles.includes("super_admin")) {
+    throw new Error("Admin access required");
+  }
+  return roles;
+}
+
+async function assertPermission(
+  context: { supabase: SupabaseClient; userId: string },
+  permission: Permission,
+) {
+  const { data: roles } = await context.supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", context.userId);
+  const roleList = (roles ?? []).map((r: { role: string }) => r.role);
+  if (roleList.includes("admin") || roleList.includes("super_admin")) return;
+  const { data: perms } = await context.supabase
+    .from("user_permissions")
+    .select("permission")
+    .eq("user_id", context.userId)
+    .eq("permission", permission);
+  if (!perms || perms.length === 0) throw new Error(`Missing permission: ${permission}`);
+}
+
 // ---------- Metrics ----------
-export const listMetrics = createServerFn({ method: "GET" }).handler(async () => {
-  return apiClient.get<any[]>("/metrics");
-});
+export const listMetrics = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("metrics")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return data;
+  });
 
 const metricInput = z.object({
   name: z.string().min(1).max(120),
@@ -30,34 +69,130 @@ const metricInput = z.object({
 });
 
 export const createMetric = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => metricInput.parse(d))
-  .handler(async ({ data }) => {
-    return apiClient.post<any>("/metrics", data);
+  .handler(async ({ data, context }) => {
+    await assertPermission(context, "manage_metrics");
+    const { data: row, error } = await context.supabase
+      .from("metrics")
+      .insert(data)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
   });
 
 export const updateMetric = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => metricInput.extend({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertPermission(context, "manage_metrics");
     const { id, ...patch } = data;
-    return apiClient.put<any>(`/metrics/${id}`, patch);
+    const { data: row, error } = await context.supabase
+      .from("metrics")
+      .update(patch)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
   });
 
 export const deleteMetric = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data }) => {
-    return apiClient.delete<{ id: string }>(`/metrics/${data.id}`);
+  .handler(async ({ data, context }) => {
+    await assertPermission(context, "manage_metrics");
+    const { error } = await context.supabase.from("metrics").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 // ---------- Users + Roles + Permissions ----------
-export const listUsers = createServerFn({ method: "GET" }).handler(async () => {
-  return apiClient.get<any[]>("/profiles");
-});
+export const listUsers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { data: profiles, error } = await context.supabase
+      .from("profiles")
+      .select(
+        "id, full_name, avatar_url, department, position_id, manager_id, is_active, created_at",
+      )
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    const { data: roles } = await context.supabase.from("user_roles").select("user_id, role");
+    const { data: perms } = await context.supabase
+      .from("user_permissions")
+      .select("user_id, permission");
 
-export const getMyProfile = createServerFn({ method: "GET" }).handler(async () => {
-  return apiClient.get<any>("/auth/me");
-});
+    const rolesByUser = new Map<string, string[]>();
+    for (const r of roles ?? []) {
+      const arr = rolesByUser.get(r.user_id) ?? [];
+      arr.push(r.role);
+      rolesByUser.set(r.user_id, arr);
+    }
+    const permsByUser = new Map<string, string[]>();
+    for (const p of perms ?? []) {
+      const arr = permsByUser.get(p.user_id) ?? [];
+      arr.push(p.permission);
+      permsByUser.set(p.user_id, arr);
+    }
+
+    // Fetch emails via admin API
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: authList } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+    const emailByUser = new Map<string, string>();
+    for (const u of authList?.users ?? []) if (u.email) emailByUser.set(u.id, u.email);
+
+    const { data: reserved } = await context.supabase.from("reserved_super_admins").select("email");
+    const reservedEmails = new Set((reserved ?? []).map((r: { email: string }) => r.email));
+
+    return (profiles ?? []).map((p) => {
+      const email = emailByUser.get(p.id) ?? null;
+      return {
+        id: p.id as string,
+        full_name: (p.full_name ?? null) as string | null,
+        avatar_url: (p.avatar_url ?? null) as string | null,
+        department: (p.department ?? null) as string | null,
+        position_id: (p.position_id ?? null) as string | null,
+        manager_id: (p.manager_id ?? null) as string | null,
+        is_active: Boolean(p.is_active),
+        created_at: p.created_at as string,
+        email,
+        roles: rolesByUser.get(p.id) ?? [],
+        permissions: permsByUser.get(p.id) ?? [],
+        is_super_admin: email ? reservedEmails.has(email) : false,
+      };
+    });
+
+  });
+
+export const getMyProfile = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: profile } = await context.supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", context.userId)
+      .single();
+    const { data: roles } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId);
+    const { data: perms } = await context.supabase
+      .from("user_permissions")
+      .select("permission")
+      .eq("user_id", context.userId);
+    return {
+      userId: context.userId,
+      profile,
+      roles: (roles ?? []).map((r: { role: string }) => r.role),
+      permissions: (perms ?? []).map((p: { permission: string }) => p.permission),
+    };
+  });
 
 export const createUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -72,24 +207,49 @@ export const createUser = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data }) => {
-    const profile = await apiClient.post<any>("/profiles", {
-      id: data.email.split("@")[0],
-      full_name: data.full_name,
-      avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${data.email}`,
+  .handler(async ({ data, context }) => {
+    await assertPermission(context, "onboard_users");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: created, error: cerr } = await supabaseAdmin.auth.admin.createUser({
+      email: data.email,
+      password: data.password,
+      email_confirm: true,
+      user_metadata: { full_name: data.full_name },
     });
-    if (data.roles.length) {
-      await apiClient.put(`/profiles/${profile.id}/roles`, { roles: data.roles });
+    if (cerr || !created.user) throw new Error(cerr?.message ?? "Failed to create user");
+    const uid = created.user.id;
+
+    // Trigger creates profile — patch with extras
+    await supabaseAdmin
+      .from("profiles")
+      .update({
+        full_name: data.full_name,
+        department: data.department ?? null,
+        position_id: data.position_id ?? null,
+        manager_id: data.manager_id ?? null,
+      })
+      .eq("id", uid);
+
+    // Filter out super_admin — not grantable
+    const roles = data.roles.filter((r) => r !== "super_admin");
+    if (roles.length) {
+      await supabaseAdmin.from("user_roles").upsert(
+        roles.map((role) => ({ user_id: uid, role })),
+        { onConflict: "user_id,role" },
+      );
     }
     if (data.permissions.length) {
-      await apiClient.put(`/profiles/${profile.id}/permissions`, {
-        permissions: data.permissions,
-      });
+      await supabaseAdmin.from("user_permissions").upsert(
+        data.permissions.map((permission) => ({ user_id: uid, permission })),
+        { onConflict: "user_id,permission" },
+      );
     }
-    return { id: profile.id || data.email };
+    return { id: uid };
   });
 
 export const setUserRoles = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -98,12 +258,27 @@ export const setUserRoles = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data }): Promise<{ ok: boolean }> => {
-    await apiClient.put(`/profiles/${data.user_id}/roles`, { roles: data.roles });
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Never modify super admin
+    const { data: isReserved } = await supabaseAdmin.rpc("is_reserved_super_admin", {
+      _user_id: data.user_id,
+    });
+    if (isReserved) throw new Error("Super admin roles are immutable");
+
+    const roles = data.roles.filter((r) => r !== "super_admin");
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", data.user_id);
+    if (roles.length) {
+      await supabaseAdmin
+        .from("user_roles")
+        .insert(roles.map((role) => ({ user_id: data.user_id, role })));
+    }
     return { ok: true };
   });
 
 export const setUserPermissions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -112,14 +287,20 @@ export const setUserPermissions = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data }): Promise<{ ok: boolean }> => {
-    await apiClient.put(`/profiles/${data.user_id}/permissions`, {
-      permissions: data.permissions,
-    });
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("user_permissions").delete().eq("user_id", data.user_id);
+    if (data.permissions.length) {
+      await supabaseAdmin
+        .from("user_permissions")
+        .insert(data.permissions.map((permission) => ({ user_id: data.user_id, permission })));
+    }
     return { ok: true };
   });
 
 export const updateUserProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -132,13 +313,17 @@ export const updateUserProfile = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data }): Promise<{ ok: boolean }> => {
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { user_id, ...patch } = data;
-    await apiClient.put(`/profiles/${user_id}`, patch);
+    const { error } = await supabaseAdmin.from("profiles").update(patch).eq("id", user_id);
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 
 export const resetUserPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -147,20 +332,42 @@ export const resetUserPassword = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async (): Promise<{ ok: boolean }> => {
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isReserved } = await supabaseAdmin.rpc("is_reserved_super_admin", {
+      _user_id: data.user_id,
+    });
+    if (isReserved) throw new Error("Super admin password cannot be changed by other admins");
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
+      password: data.new_password,
+    });
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 
 export const changeMyPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ new_password: z.string().min(8).max(128) }).parse(d))
-  .handler(async (): Promise<{ ok: boolean }> => {
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.auth.updateUser({ password: data.new_password });
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 
 export const deleteUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ user_id: z.string().uuid() }).parse(d))
-  .handler(async ({ data }) => {
-    return apiClient.delete<{ id: string }>(`/profiles/${data.user_id}`);
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isReserved } = await supabaseAdmin.rpc("is_reserved_super_admin", {
+      _user_id: data.user_id,
+    });
+    if (isReserved) throw new Error("Super admin cannot be deleted");
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const bootstrapSuperAdmin = createServerFn({ method: "POST" })
@@ -172,45 +379,107 @@ export const bootstrapSuperAdmin = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data }): Promise<{ ok: boolean }> => {
-    await apiClient.post("/auth/login", { email: data.email, password: data.password });
-    return { ok: true };
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: reserved } = await supabaseAdmin
+      .from("reserved_super_admins")
+      .select("email")
+      .eq("email", data.email)
+      .maybeSingle();
+    if (!reserved) throw new Error("Not a reserved super admin");
+
+    const { data: list } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+    const existing = list?.users.find((u) => u.email === data.email);
+    if (existing) {
+      // Ensure role rows exist (bypass trigger via SECURITY DEFINER path uses insert directly)
+      await supabaseAdmin.from("user_roles").upsert(
+        [
+          { user_id: existing.id, role: "super_admin" },
+          { user_id: existing.id, role: "admin" },
+        ],
+        { onConflict: "user_id,role" },
+      );
+      return { ok: true, created: false };
+    }
+    const { error } = await supabaseAdmin.auth.admin.createUser({
+      email: data.email,
+      password: data.password,
+      email_confirm: true,
+      user_metadata: { full_name: "Super Admin" },
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true, created: true };
   });
 
 // ---------- Positions ----------
 const positionInput = z.object({
   title: z.string().min(1).max(120),
-  department: z.string().max(120).optional().nullable(),
-  description: z.string().max(500).optional().nullable(),
+  level: z.number().int().min(0).max(20),
+  parent_position_id: z.string().uuid().nullable().optional(),
 });
 
-export const listPositions = createServerFn({ method: "GET" }).handler(async () => {
-  return apiClient.get<any[]>("/positions");
-});
+export const listPositions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("positions")
+      .select("*")
+      .order("level", { ascending: true });
+    if (error) throw new Error(error.message);
+    return data;
+  });
 
 export const createPosition = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => positionInput.parse(d))
-  .handler(async ({ data }) => {
-    return apiClient.post<any>("/positions", data);
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { data: row, error } = await context.supabase
+      .from("positions")
+      .insert(data)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
   });
 
 export const updatePosition = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => positionInput.extend({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
     const { id, ...patch } = data;
-    return apiClient.put<any>(`/positions/${id}`, patch);
+    const { data: row, error } = await context.supabase
+      .from("positions")
+      .update(patch)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
   });
 
 export const deletePosition = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data }) => {
-    return apiClient.delete<{ id: string }>(`/positions/${data.id}`);
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { error } = await context.supabase.from("positions").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
-// ---------- Communication Flows ----------
-export const listFlows = createServerFn({ method: "GET" }).handler(async () => {
-  return [];
-});
+// ---------- Communication Flows (unchanged) ----------
+export const listFlows = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("communication_flows")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return data;
+  });
 
 const flowInput = z.object({
   name: z.string().min(1).max(120),
@@ -221,34 +490,79 @@ const flowInput = z.object({
 });
 
 export const createFlow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => flowInput.parse(d))
-  .handler(async (): Promise<{ ok: boolean }> => {
-    return { ok: true };
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { data: row, error } = await context.supabase
+      .from("communication_flows")
+      .insert(data)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
   });
 
 export const updateFlow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => flowInput.extend({ id: z.string().uuid() }).parse(d))
-  .handler(async (): Promise<{ ok: boolean }> => {
-    return { ok: true };
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { id, ...patch } = data;
+    const { data: row, error } = await context.supabase
+      .from("communication_flows")
+      .update(patch)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
   });
 
 export const deleteFlow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async (): Promise<{ ok: boolean }> => {
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { error } = await context.supabase.from("communication_flows").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 
+// Compatibility alias for existing admin.users page
 export const toggleAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z.object({ user_id: z.string().uuid(), make_admin: z.boolean() }).parse(d),
   )
-  .handler(async ({ data }): Promise<{ ok: boolean }> => {
-    const roles = data.make_admin ? ["admin"] : ["user"];
-    await apiClient.put(`/profiles/${data.user_id}/roles`, { roles });
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isReserved } = await supabaseAdmin.rpc("is_reserved_super_admin", {
+      _user_id: data.user_id,
+    });
+    if (isReserved) throw new Error("Super admin roles are immutable");
+    if (data.make_admin) {
+      await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: data.user_id, role: "admin" }, { onConflict: "user_id,role" });
+    } else {
+      await supabaseAdmin
+        .from("user_roles")
+        .delete()
+        .eq("user_id", data.user_id)
+        .eq("role", "admin");
+    }
     return { ok: true };
   });
 
-export const getMyRoles = createServerFn({ method: "GET" }).handler(async () => {
-  const me = await apiClient.get<any>("/auth/me");
-  return { roles: me?.roles || [], userId: me?.user?.id || "" };
-});
+export const getMyRoles = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { roles: (data ?? []).map((r) => r.role), userId: context.userId };
+  });

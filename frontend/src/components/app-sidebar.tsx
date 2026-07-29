@@ -28,7 +28,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { setAuthToken } from "@/lib/api-client";
+import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -60,7 +60,7 @@ export function AppSidebar() {
   async function signOut() {
     await qc.cancelQueries();
     qc.clear();
-    setAuthToken(null);
+    await supabase.auth.signOut();
     toast.success("Signed out");
     navigate({ to: "/auth", replace: true });
   }

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { apiClient } from "./api-client";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export interface TeamMember {
   id: string;
@@ -20,11 +20,51 @@ export interface Team {
   members: TeamMember[];
 }
 
-export const listTeams = createServerFn({ method: "GET" }).handler(async (): Promise<Team[]> => {
-  return apiClient.get<Team[]>("/teams");
-});
+export const listTeams = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<Team[]> => {
+    const { data: teams, error } = await context.supabase
+      .from("teams")
+      .select("id, name, description, lead_id, created_at")
+      .order("created_at");
+    if (error) throw new Error(error.message);
+    if (!teams || teams.length === 0) return [];
+
+    const { data: members } = await context.supabase
+      .from("team_members")
+      .select("id, team_id, user_id, role");
+    const ids = Array.from(
+      new Set([
+        ...teams.map((t) => t.lead_id).filter((v): v is string => Boolean(v)),
+        ...(members ?? []).map((m) => m.user_id),
+      ]),
+    );
+    const { data: profiles } = ids.length
+      ? await context.supabase.from("profiles").select("id, full_name").in("id", ids)
+      : { data: [] };
+    const nameMap = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
+
+    return teams.map((t) => ({
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      lead_id: t.lead_id,
+      lead_name: t.lead_id ? ((nameMap.get(t.lead_id) ?? null) as string | null) : null,
+      created_at: t.created_at,
+      members: (members ?? [])
+        .filter((m) => m.team_id === t.id)
+        .map((m) => ({
+          id: m.id,
+          team_id: m.team_id,
+          user_id: m.user_id,
+          role: m.role as TeamMember["role"],
+          user_name: (nameMap.get(m.user_id) ?? null) as string | null,
+        })),
+    }));
+  });
 
 export const createTeam = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -34,17 +74,36 @@ export const createTeam = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data }) => {
-    return apiClient.post<Team>("/teams", data);
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("teams")
+      .insert({
+        name: data.name,
+        description: data.description || null,
+        lead_id: data.lead_id || null,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    if (data.lead_id) {
+      await context.supabase
+        .from("team_members")
+        .insert({ team_id: row.id, user_id: data.lead_id, role: "lead" });
+    }
+    return row;
   });
 
 export const deleteTeam = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data }) => {
-    return apiClient.delete<{ id: string }>(`/teams/${data.id}`);
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("teams").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { success: true };
   });
 
 export const addTeamMember = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -54,21 +113,25 @@ export const addTeamMember = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data }) => {
-    return apiClient.post<TeamMember>(`/teams/${data.team_id}/members`, {
-      user_id: data.user_id,
-      role: data.role,
-    });
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("team_members")
+      .upsert(data, { onConflict: "team_id,user_id" });
+    if (error) throw new Error(error.message);
+    return { success: true };
   });
 
 export const removeTeamMember = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data }) => {
-    // Note: data.id can be team_id or member ID; if passed team_id & user_id or id:
-    return apiClient.delete<{ success: boolean }>(`/teams/${data.id}/members/${data.id}`);
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("team_members").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { success: true };
   });
 
 export const delegatePower = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -78,12 +141,19 @@ export const delegatePower = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data }) => {
-    await apiClient.put(`/profiles/${data.user_id}/roles`, { role: data.role });
+  .handler(async ({ data, context }) => {
+    const { error: roleErr } = await context.supabase
+      .from("user_roles")
+      .upsert({ user_id: data.user_id, role: data.role }, { onConflict: "user_id,role" });
+    if (roleErr) throw new Error(roleErr.message);
+
     if (data.permissions) {
-      await apiClient.put(`/profiles/${data.user_id}/permissions`, {
-        permissions: data.permissions,
-      });
+      await context.supabase.from("user_permissions").delete().eq("user_id", data.user_id);
+      if (data.permissions.length > 0) {
+        const rows = data.permissions.map((p) => ({ user_id: data.user_id, permission: p }));
+        const { error } = await context.supabase.from("user_permissions").insert(rows);
+        if (error) throw new Error(error.message);
+      }
     }
     return { success: true };
   });
