@@ -67,6 +67,11 @@ function RootDocument({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="dark">
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("momentum-theme");var el=document.documentElement;el.classList.remove("dark","dark-premium","cherry-blossom","winter-light","light");if(t==="dark-premium"){el.classList.add("dark-premium");}else if(t==="winter-light"){el.classList.add("winter-light");}else if(t==="cherry-blossom"||t==="light"){el.classList.add("cherry-blossom");}else{el.classList.add("dark");}}catch(e){}})()`,
+          }}
+        />
         <HeadContent />
       </head>
       <body>

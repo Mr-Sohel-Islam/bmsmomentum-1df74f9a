@@ -15,10 +15,12 @@ app.use(
   cors({
     origin: (origin, callback) => {
       const allowedOrigins = getCorsAllowedOrigins();
-      if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+      if (!origin) {
         callback(null, true);
+      } else if (allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+        callback(null, origin);
       } else {
-        callback(null, true);
+        callback(null, origin);
       }
     },
     credentials: true,

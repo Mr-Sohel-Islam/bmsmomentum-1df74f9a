@@ -65,76 +65,207 @@
   --shadow-panel: 0 1px 0 0 oklch(1 0 0 / 0.04) inset, 0 20px 40px -20px oklch(0 0 0 / 0.6);
 }
 
-:root {
+:root,
+.cherry-blossom {
   --radius: 0.5rem;
 
-  /* Dark-first — this is the app's canonical look. */
+  /*
+   * Cherry Blossom Light — Soft pink, clean white, pale green & sunny optimism yellow.
+   * Palette: #F2C7C7 (Rose), #FFFFFF (White), #D5F3D8 (Pale Mint), #FFB7C5 (Blossom Pink),
+   * Accent Yellows: #FFFF66, #FFE566, #D6D58B, #B3B347
+   */
+  --background: #FFFDFE;
+  --foreground: #1E293B;
+
+  --card: #FFFFFF;
+  --card-foreground: #1E293B;
+  --popover: #FFFFFF;
+  --popover-foreground: #1E293B;
+
+  /* Blossom Pink (#FFB7C5) & Soft Rose (#F2C7C7) Primary */
+  --primary: #FFB7C5;
+  --primary-foreground: #4A1220;
+
+  /* Pale Mint Green (#D5F3D8) Secondary */
+  --secondary: #D5F3D8;
+  --secondary-foreground: #144922;
+
+  /* Soft Rose Wash Muted */
+  --muted: #FFF0F3;
+  --muted-foreground: #64748B;
+
+  /* Sunny Optimism Yellow (#FFE566) Accent */
+  --accent: #FFE566;
+  --accent-foreground: #473B00;
+
+  --destructive: #F87171;
+  --destructive-foreground: #FFFFFF;
+  --success: #6EE7B7;
+  --success-foreground: #064E3B;
+  --warning: #FFE566;
+  --warning-foreground: #473B00;
+
+  --border: #F2C7C7;
+  --input: #FDE8ED;
+  --ring: #FFB7C5;
+
+  /* Charts with pinks, greens, and sunny yellows */
+  --chart-1: #FFB7C5; /* Blossom Pink */
+  --chart-2: #86EFAC; /* Pale Mint (#D5F3D8) */
+  --chart-3: #FFE566; /* Sunny Yellow */
+  --chart-4: #B3B347; /* Golden Olive */
+  --chart-5: #F2C7C7; /* Soft Rose */
+
+  --sidebar: #FFF9FB;
+  --sidebar-foreground: #1E293B;
+  --sidebar-primary: #FFB7C5;
+  --sidebar-primary-foreground: #4A1220;
+  --sidebar-accent: #D5F3D8;
+  --sidebar-accent-foreground: #144922;
+  --sidebar-border: #F2C7C7;
+  --sidebar-ring: #FFB7C5;
+}
+
+.winter-light {
+  --radius: 0.5rem;
+
+  /*
+   * Winter Light — Crisp snow white, light ice blue, slate frost, and deep navy blue.
+   * Palette: #6D8196 (Slate Frost), #ADD8E6 (Light Ice), #FFFAFA (Snow White), #000080 (Deep Navy)
+   */
+  --background: #FFFAFA;
+  --foreground: #0A192F;
+
+  --card: #FFFFFF;
+  --card-foreground: #0A192F;
+  --popover: #FFFFFF;
+  --popover-foreground: #0A192F;
+
+  /* Deep Navy Blue (#000080) Primary */
+  --primary: #000080;
+  --primary-foreground: #FFFAFA;
+
+  /* Light Ice Blue (#ADD8E6) Secondary */
+  --secondary: #ADD8E6;
+  --secondary-foreground: #000080;
+
+  /* Frost Slate Wash Muted */
+  --muted: #F0F5F9;
+  --muted-foreground: #6D8196;
+
+  /* Light Ice / Slate Frost Accent */
+  --accent: #ADD8E6;
+  --accent-foreground: #000080;
+
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --success: #38BDF8;
+  --success-foreground: #0A192F;
+  --warning: #F59E0B;
+  --warning-foreground: #FFFFFF;
+
+  --border: #D1E3F0;
+  --input: #E4EFF7;
+  --ring: #6D8196;
+
+  /* Charts with navy, slate frost, ice blue */
+  --chart-1: #000080;
+  --chart-2: #6D8196;
+  --chart-3: #38BDF8;
+  --chart-4: #0284C7;
+  --chart-5: #ADD8E6;
+
+  --sidebar: #F4F8FB;
+  --sidebar-foreground: #0A192F;
+  --sidebar-primary: #000080;
+  --sidebar-primary-foreground: #FFFAFA;
+  --sidebar-accent: #ADD8E6;
+  --sidebar-accent-foreground: #000080;
+  --sidebar-border: #D1E3F0;
+  --sidebar-ring: #6D8196;
+}
+
+.dark-premium {
+  --radius: 0.5rem;
+
+  /*
+   * Dark Premium — Golden Black with Silver & Platinum Accents.
+   * Deep obsidian black background (#0B0C0E), metallic gold primary (#D4AF37), polished silver secondary (#C0C0C0).
+   */
+  --background: #0B0C0E;
+  --foreground: #F8FAFC;
+
+  --card: #141619;
+  --card-foreground: #F8FAFC;
+  --popover: #141619;
+  --popover-foreground: #F8FAFC;
+
+  /* Metallic Warm Gold (#D4AF37) Primary */
+  --primary: #D4AF37;
+  --primary-foreground: #0B0C0E;
+
+  /* Polished Silver (#C0C0C0) Secondary */
+  --secondary: #242830;
+  --secondary-foreground: #E2E8F0;
+
+  /* Onyx Graphite Muted */
+  --muted: #1A1D22;
+  --muted-foreground: #94A3B8;
+
+  /* Champagne Gold Accent */
+  --accent: #F3E5AB;
+  --accent-foreground: #0B0C0E;
+
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --success: #10B981;
+  --success-foreground: #0B0C0E;
+  --warning: #F59E0B;
+  --warning-foreground: #0B0C0E;
+
+  --border: rgba(212, 175, 55, 0.22);
+  --input: #1E2229;
+  --ring: rgba(212, 175, 55, 0.6);
+
+  /* Charts with metallic gold, silver, champagne */
+  --chart-1: #D4AF37; /* Metallic Gold */
+  --chart-2: #C0C0C0; /* Polished Silver */
+  --chart-3: #F3E5AB; /* Champagne Gold */
+  --chart-4: #94A3B8; /* Platinum Silver */
+  --chart-5: #EAB308; /* Bright Amber Gold */
+
+  --sidebar: #0D0E11;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-primary: #D4AF37;
+  --sidebar-primary-foreground: #0B0C0E;
+  --sidebar-accent: #1F2228;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: rgba(212, 175, 55, 0.15);
+  --sidebar-ring: rgba(212, 175, 55, 0.6);
+}
+
+.dark {
+  /* Canonical dark-forward operations aesthetic — preserved exactly. */
   --background: oklch(0.16 0.015 250);
   --foreground: oklch(0.97 0.005 240);
-
   --card: oklch(0.205 0.018 250);
   --card-foreground: oklch(0.97 0.005 240);
   --popover: oklch(0.205 0.018 250);
   --popover-foreground: oklch(0.97 0.005 240);
-
-  /* Signal green — momentum */
   --primary: oklch(0.82 0.19 148);
   --primary-foreground: oklch(0.16 0.03 155);
-
   --secondary: oklch(0.26 0.02 250);
   --secondary-foreground: oklch(0.97 0.005 240);
-
   --muted: oklch(0.24 0.018 250);
   --muted-foreground: oklch(0.68 0.02 250);
-
   --accent: oklch(0.28 0.03 220);
   --accent-foreground: oklch(0.97 0.005 240);
-
   --destructive: oklch(0.65 0.22 25);
   --destructive-foreground: oklch(0.98 0 0);
   --success: oklch(0.78 0.17 148);
   --success-foreground: oklch(0.16 0.03 155);
   --warning: oklch(0.82 0.16 75);
   --warning-foreground: oklch(0.2 0.02 75);
-
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.82 0.19 148 / 60%);
-
-  --chart-1: oklch(0.82 0.19 148);
-  --chart-2: oklch(0.72 0.15 220);
-  --chart-3: oklch(0.78 0.16 75);
-  --chart-4: oklch(0.7 0.2 320);
-  --chart-5: oklch(0.72 0.16 25);
-
-  --sidebar: oklch(0.18 0.018 250);
-  --sidebar-foreground: oklch(0.88 0.01 240);
-  --sidebar-primary: oklch(0.82 0.19 148);
-  --sidebar-primary-foreground: oklch(0.16 0.03 155);
-  --sidebar-accent: oklch(0.24 0.02 250);
-  --sidebar-accent-foreground: oklch(0.97 0.005 240);
-  --sidebar-border: oklch(1 0 0 / 6%);
-  --sidebar-ring: oklch(0.82 0.19 148 / 60%);
-}
-
-.dark {
-  /* Same tokens — this app is dark by default. */
-  --background: oklch(0.16 0.015 250);
-  --foreground: oklch(0.97 0.005 240);
-  --card: oklch(0.205 0.018 250);
-  --card-foreground: oklch(0.97 0.005 240);
-  --popover: oklch(0.205 0.018 250);
-  --popover-foreground: oklch(0.97 0.005 240);
-  --primary: oklch(0.82 0.19 148);
-  --primary-foreground: oklch(0.16 0.03 155);
-  --secondary: oklch(0.26 0.02 250);
-  --secondary-foreground: oklch(0.97 0.005 240);
-  --muted: oklch(0.24 0.018 250);
-  --muted-foreground: oklch(0.68 0.02 250);
-  --accent: oklch(0.28 0.03 220);
-  --accent-foreground: oklch(0.97 0.005 240);
-  --destructive: oklch(0.65 0.22 25);
-  --destructive-foreground: oklch(0.98 0 0);
   --border: oklch(1 0 0 / 8%);
   --input: oklch(1 0 0 / 10%);
   --ring: oklch(0.82 0.19 148 / 60%);
@@ -154,18 +285,50 @@
   }
 
   html {
-    color-scheme: dark;
     font-family: var(--font-sans);
     font-feature-settings: "cv11", "ss01", "ss03";
+  }
+
+  html.dark,
+  html.dark-premium {
+    color-scheme: dark;
+  }
+
+  html.cherry-blossom,
+  html.light,
+  html.winter-light {
+    color-scheme: light;
   }
 
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     background-image:
+      radial-gradient(1200px 600px at 85% -10%, #FFB7C535, transparent 60%),
+      radial-gradient(900px 500px at 0% 100%, #D5F3D860, transparent 60%),
+      radial-gradient(800px 400px at 20% 0%, #FFE56625, transparent 60%);
+    background-attachment: fixed;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  .dark-premium body {
+    background-image:
+      radial-gradient(1200px 600px at 85% -10%, rgba(212, 175, 55, 0.12), transparent 60%),
+      radial-gradient(900px 500px at 0% 100%, rgba(192, 192, 192, 0.08), transparent 60%),
+      radial-gradient(800px 400px at 30% 20%, rgba(243, 229, 171, 0.06), transparent 60%);
+  }
+
+  .winter-light body {
+    background-image:
+      radial-gradient(1200px 600px at 85% -10%, #ADD8E650, transparent 60%),
+      radial-gradient(900px 500px at 0% 100%, #6D819630, transparent 60%),
+      radial-gradient(800px 400px at 20% 0%, #00008015, transparent 60%);
+  }
+
+  .dark body {
+    background-image:
       radial-gradient(1200px 600px at 85% -10%, oklch(0.82 0.19 148 / 0.08), transparent 60%),
       radial-gradient(900px 500px at 0% 100%, oklch(0.72 0.15 220 / 0.06), transparent 60%);
-    background-attachment: fixed;
   }
 
   h1,

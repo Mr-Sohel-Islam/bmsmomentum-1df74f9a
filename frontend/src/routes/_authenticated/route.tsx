@@ -7,6 +7,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
 import { CommandPalette } from "@/components/command-palette";
 import { NotificationCenter } from "@/components/notification-center";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -58,6 +59,9 @@ function AuthedLayout() {
                   <span className="text-[10px]">⌘</span>K
                 </kbd>
               </Button>
+
+              {/* Theme Toggle: Dark Mode (Signal Green) vs Light Mode (Soft Pink, Pale Green, Sunny Yellow) */}
+              <ThemeToggle />
 
               {/* Real-time Notification Center Bell & Sidebar */}
               <NotificationCenter />
