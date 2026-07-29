@@ -124,22 +124,26 @@ function AppreciationPage() {
 }
 
 function FeedRow({ item }: { item: FeedItem }) {
+  const fromUser = item.from || { full_name: "Team Member", avatar_url: undefined };
+  const toUser = item.to || { full_name: "Team Member", avatar_url: undefined };
+  const createdAt = item.created_at ? new Date(item.created_at) : new Date();
+
   return (
     <div className="flex items-start gap-3 border-b border-border/40 px-5 py-4 last:border-0">
       <Avatar className="h-9 w-9">
-        <AvatarImage src={item.from.avatar_url ?? undefined} />
-        <AvatarFallback>{(item.from.full_name ?? "?").slice(0, 1)}</AvatarFallback>
+        <AvatarImage src={fromUser.avatar_url ?? undefined} />
+        <AvatarFallback>{(fromUser.full_name ?? "?").slice(0, 1)}</AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm">
-          <span className="font-medium">{item.from.full_name ?? "Unknown"}</span>
+          <span className="font-medium">{fromUser.full_name ?? "Team Member"}</span>
           <span className="text-muted-foreground">appreciated</span>
-          <span className="font-medium">{item.to.full_name ?? "Unknown"}</span>
+          <span className="font-medium">{toUser.full_name ?? "Team Member"}</span>
           <Badge variant="secondary" className="ml-1 font-mono text-[10px]">
-            +{item.points}
+            +{item.points || 5}
           </Badge>
           <span className="ml-auto text-xs text-muted-foreground">
-            {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+            {formatDistanceToNow(createdAt, { addSuffix: true })}
           </span>
         </div>
         <p className="mt-1 text-sm text-foreground/90">{item.message}</p>

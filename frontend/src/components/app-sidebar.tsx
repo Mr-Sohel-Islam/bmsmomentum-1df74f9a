@@ -15,6 +15,7 @@ import {
   Inbox,
   GitBranch,
   ShieldCheck,
+  Package,
 } from "lucide-react";
 import {
   Sidebar,
@@ -34,6 +35,7 @@ import { toast } from "sonner";
 
 const main = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Products", url: "/products", icon: Package },
   { title: "My Performance", url: "/performance", icon: TrendingUp },
   { title: "Tasks", url: "/tasks", icon: CheckSquare },
   { title: "Appreciation", url: "/appreciation", icon: MessageSquareHeart },

@@ -1,9 +1,23 @@
-import { Router } from "express";
-import { UserController } from "../controllers/user.controller";
-import { asyncHandler } from "../utils/response";
-import { requireAuth, requirePermission } from "../middleware/auth.middleware";
+import { Router, Request, Response } from "express";
+import { UserController } from "../controllers/user.controller.js";
+import { asyncHandler } from "../utils/response.js";
+import { requireAuth, requirePermission } from "../middleware/auth.middleware.js";
+import { resetAndSeedDatabase } from "../db.js";
 
 const router = Router();
+
+// Reset and Seed complete application flows
+router.post("/reset-seed", requireAuth, async (_req: Request, res: Response) => {
+  try {
+    await resetAndSeedDatabase();
+    return res.json({
+      success: true,
+      message: "Database cleared and re-initialized with complete application flows (Sprints, Epics, Tasks, Products, Onboarding, Approvals, Hierarchy).",
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 router.get("/profiles", requireAuth, requirePermission("users:read"), asyncHandler(UserController.getProfiles));
 router.get("/profiles/:id", requireAuth, requirePermission("users:read"), asyncHandler(UserController.getProfileById));

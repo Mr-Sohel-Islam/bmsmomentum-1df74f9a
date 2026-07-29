@@ -1,6 +1,6 @@
 import { RowDataPacket, ResultSetHeader } from "mysql2/promise";
-import { pool } from "../db";
-import { crypto } from "../utils";
+import { pool } from "../db.js";
+import crypto from "crypto";
 
 export interface ApprovalWorkflow {
   id: string;
@@ -199,16 +199,61 @@ export class ApprovalModel {
       "INSERT INTO approval_actions (id, request_id, approver_id, step_order, decision, note) VALUES (?, ?, ?, ?, ?, ?)",
       [id, requestId, approverId, stepOrder, decision, note || null],
     );
+
+    // Fetch approval request to find entity details
+    const [reqRows] = await pool.query<RowDataPacket[]>(
+      "SELECT * FROM approval_requests WHERE id = ?",
+      [requestId]
+    );
+
+    const req = reqRows[0] as ApprovalRequest | undefined;
+
     if (decision === "rejected") {
       await pool.query("UPDATE approval_requests SET status = 'rejected' WHERE id = ?", [
         requestId,
       ]);
+
+      // Sync linked product_items status if applicable
+      if (req && (req.entity_type === "product_item" || req.entity_id)) {
+        await pool.query(
+          "UPDATE product_items SET status = 'rejected' WHERE id = ? OR approval_request_id = ?",
+          [req.entity_id, requestId]
+        );
+      }
     } else {
-      await pool.query(
-        "UPDATE approval_requests SET current_step = current_step + 1, current_step_order = current_step_order + 1 WHERE id = ?",
-        [requestId],
-      );
+      // Check total workflow steps
+      let totalSteps = 1;
+      if (req?.workflow_id) {
+        const [steps] = await pool.query<RowDataPacket[]>(
+          "SELECT COUNT(*) as count FROM approval_steps WHERE workflow_id = ?",
+          [req.workflow_id]
+        );
+        totalSteps = Math.max(1, steps[0]?.count || 1);
+      }
+
+      if (stepOrder >= totalSteps) {
+        // Final Step Approval!
+        await pool.query(
+          "UPDATE approval_requests SET status = 'approved', current_step_order = current_step_order + 1 WHERE id = ?",
+          [requestId]
+        );
+
+        // Sync linked product_items status to 'onboarded'
+        if (req && (req.entity_type === "product_item" || req.entity_id)) {
+          await pool.query(
+            "UPDATE product_items SET status = 'onboarded' WHERE id = ? OR approval_request_id = ?",
+            [req.entity_id, requestId]
+          );
+        }
+      } else {
+        // Intermediate Step Approval
+        await pool.query(
+          "UPDATE approval_requests SET current_step = current_step + 1, current_step_order = current_step_order + 1 WHERE id = ?",
+          [requestId]
+        );
+      }
     }
+
     const [rows] = await pool.query<RowDataPacket[]>(
       "SELECT * FROM approval_actions WHERE id = ?",
       [id],
