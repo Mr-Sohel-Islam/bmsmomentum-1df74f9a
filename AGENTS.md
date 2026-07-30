@@ -10,3 +10,21 @@
 > the editor, so keep the branch in a working state.
 
 <!-- LOVABLE:END -->
+
+# 🤖 AI Assistant Navigation Guidelines
+
+Welcome AI Coding Assistant! To understand this repository instantly without doing wasteful full-codebase directory scans:
+
+1. Read **[`ARCHITECTURE.md`](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/ARCHITECTURE.md)**:
+   - Complete directory index mapping every module, route, model, controller, component, and utility.
+   - Database schema tables and foreign key linkages.
+   - Core operational data flows and AI developer best practices.
+
+2. Read **[`REPORT.md`](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/REPORT.md)**:
+   - System workflow map (Mermaid architecture diagram).
+   - Role-Based Access Control (RBAC) matrix and permission mapping.
+   - Database reset and complete seeding log.
+   - Bug and loophole audit report.
+
+3. Read **[`implementation_plan.md`](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/implementation_plan.md)**:
+   - Detailed workflow optimization plan and component modification details.
