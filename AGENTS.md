@@ -20,11 +20,17 @@ Welcome AI Coding Assistant! To understand this repository instantly without doi
    - Database schema tables and foreign key linkages.
    - Core operational data flows and AI developer best practices.
 
-2. Read **[`REPORT.md`](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/REPORT.md)**:
-   - System workflow map (Mermaid architecture diagram).
+2. Read **[`BACKEND_ARCHITECTURE.md`](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/BACKEND_ARCHITECTURE.md)**:
+   - Deep backend analysis & architectural diagrams.
+   - Exhaustive catalog of **every REST API endpoint**, HTTP method, permissions, payload, DB dependencies, and future scopes.
+   - Internal real-time entity synchronization engine & event callbacks.
+   - Complete UI & Backend completion matrix.
+
+3. Read **[`REPORT.md`](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/REPORT.md)**:
+   - Master system workflow map (Mermaid architecture diagram).
    - Role-Based Access Control (RBAC) matrix and permission mapping.
    - Database reset and complete seeding log.
    - Bug and loophole audit report.
 
-3. Read **[`implementation_plan.md`](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/implementation_plan.md)**:
+4. Read **[`implementation_plan.md`](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/implementation_plan.md)**:
    - Detailed workflow optimization plan and component modification details.
