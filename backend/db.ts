@@ -1,6 +1,5 @@
 import mysql from "mysql2/promise";
 import dotenv from "dotenv";
-import crypto from "crypto";
 
 dotenv.config();
 
@@ -47,16 +46,19 @@ async function addColumnIfNotExist(
   }
 }
 
-export async function resetAndSeedDatabase() {
+export async function wipeAllTables() {
   await initDb();
   const connection = await pool.getConnection();
   try {
-    console.log("[MySQL Backend] Clearing database tables for fresh complete flow re-initialization...");
+    console.log("[MySQL Backend] Wiping all database table records...");
 
-    // Disable foreign key checks for clean truncation
     await connection.query("SET FOREIGN_KEY_CHECKS = 0;");
 
     const tablesToClean = [
+      "doctors",
+      "trade_entities",
+      "daily_reports",
+      "pharma_products",
       "approval_actions",
       "approval_requests",
       "approval_steps",
@@ -78,15 +80,76 @@ export async function resetAndSeedDatabase() {
       "team_members",
       "teams",
       "user_roles",
+      "user_permissions",
       "user_positions",
       "profiles",
+      "reserved_super_admins",
+    ];
+
+    for (const t of tablesToClean) {
+      try {
+        await connection.query(`TRUNCATE TABLE ${t};`);
+      } catch {
+        try {
+          await connection.query(`DELETE FROM ${t};`);
+        } catch {
+          // Table does not exist yet
+        }
+      }
+    }
+
+    await connection.query("SET FOREIGN_KEY_CHECKS = 1;");
+    console.log("[MySQL Backend] All tables wiped completely!");
+  } finally {
+    connection.release();
+  }
+}
+
+export async function resetAndSeedDatabase() {
+  await initDb();
+  const connection = await pool.getConnection();
+  try {
+    console.log("[MySQL Backend] Clearing database tables for fresh complete flow re-initialization...");
+
+    await connection.query("SET FOREIGN_KEY_CHECKS = 0;");
+
+    const tablesToClean = [
+      "doctors",
+      "trade_entities",
+      "daily_reports",
+      "pharma_products",
+      "approval_actions",
+      "approval_requests",
+      "approval_steps",
+      "approval_workflows",
+      "product_dependencies",
+      "product_items",
+      "products",
+      "product_tasks",
+      "product_form_schemas",
+      "task_comments",
+      "task_attachments",
+      "task_history",
+      "tasks",
+      "sprints",
+      "epics",
+      "performance_reviews",
+      "performance_metrics",
+      "appreciations",
+      "team_members",
+      "teams",
+      "user_roles",
+      "user_permissions",
+      "user_positions",
+      "profiles",
+      "reserved_super_admins",
     ];
 
     for (const t of tablesToClean) {
       try {
         await connection.query(`DELETE FROM ${t};`);
       } catch {
-        // Table does not exist yet; will be created in seed
+        // Table does not exist
       }
     }
 
@@ -100,7 +163,7 @@ export async function resetAndSeedDatabase() {
 }
 
 async function seedCompleteApplicationFlows(connection: mysql.PoolConnection) {
-  console.log("[MySQL Backend] Seeding complete application flows (Sprints, Epics, Tasks, Products, Onboarding, Approvals, Teams, Hierarchy)...");
+  console.log("[MySQL Backend] Seeding complete Working Pyramid Hierarchy, Doctors, Trade Entities, Daily Reports & 3D Detailing Products...");
 
   // 1. Reserved Super Admin Email
   await connection.query(
@@ -108,14 +171,16 @@ async function seedCompleteApplicationFlows(connection: mysql.PoolConnection) {
     ["rsa-super-admin", "soheljavadeveloper@gmail.com"],
   );
 
-  // 2. Positions
+  // 2. Positions (Full 8-Tier Working Pyramid Hierarchy)
   const positions = [
-    { id: "pos-admin", title: "Super Admin & Executive", department: "Executive Leadership" },
-    { id: "pos-eng-mgr", title: "Engineering Manager", department: "Engineering" },
-    { id: "pos-health-mgr", title: "Healthcare Operations Manager", department: "Healthcare Operations" },
-    { id: "pos-po", title: "Lead Product Owner", department: "Product Management" },
-    { id: "pos-sr-dev", title: "Senior Full Stack Engineer", department: "Engineering" },
-    { id: "pos-qa", title: "QA & Test Lead", department: "Quality Assurance" },
+    { id: "pos-director", title: "Director / Chairman", department: "Executive Board", level: 0 },
+    { id: "pos-gm", title: "General Manager", department: "General Operations", level: 1 },
+    { id: "pos-rm", title: "Regional Manager", department: "Regional Sales", level: 2 },
+    { id: "pos-bm", title: "Business Manager", department: "Business Development", level: 3 },
+    { id: "pos-sm", title: "Sales Manager", department: "Sales Operations", level: 4 },
+    { id: "pos-am", title: "Area Manager", department: "Territory Management", level: 5 },
+    { id: "pos-smr", title: "Sr. Medical Representative", department: "Field Operations", level: 6 },
+    { id: "pos-mr", title: "Medical Representative", department: "Field Operations", level: 7 },
   ];
 
   for (const pos of positions) {
@@ -125,68 +190,192 @@ async function seedCompleteApplicationFlows(connection: mysql.PoolConnection) {
     );
   }
 
-  // 3. User Profiles & Roles
+  // 3. Profiles (The Working Pyramid Hierarchy with Required Fields)
   const seedMembers = [
     {
-      id: "soheljavadeveloper",
-      full_name: "Sohel Islam (Super Admin)",
-      department: "Executive Leadership",
-      position_id: "pos-admin",
+      id: "director.main",
+      full_name: "Sohel Islam (Director / Chairman)",
+      department: "Executive Board",
+      position_id: "pos-director",
       manager_id: null,
-      roles: ["super_admin", "admin"],
-      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=sohel",
+      designation: "Director & Chairman",
+      area: "National Head Office",
+      office_number: "+91 11 4982 9000",
+      personal_number: "+91 98765 00001",
+      emergency_family_number: "+91 98765 00002",
+      referrals_contact: "Dr. A. K. Sharma (AIIMS), Dr. R. N. Mukherjee (Apollo)",
+      official_email: "director@momentumpharma.com",
+      personal_email: "sohel.director@gmail.com",
+      residential_address: "Penthouse 14, Executive Towers, Golf Course Road, Gurgaon",
+      id_documents_url: "https://docs.momentum.com/id/director-passport.pdf",
+      bank_details_url: "https://docs.momentum.com/bank/director-hdfc.pdf",
+      official_id_no: "DIR-001",
+      roles: ["super_admin", "admin", "director"],
+      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=director",
     },
     {
-      id: "alex.rivera",
-      full_name: "Alex Rivera",
-      department: "Engineering",
-      position_id: "pos-eng-mgr",
-      manager_id: "soheljavadeveloper",
-      roles: ["manager", "scrum_master"],
-      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=alex",
+      id: "gm.sharma",
+      full_name: "Rajesh Sharma (General Manager)",
+      department: "General Operations",
+      position_id: "pos-gm",
+      manager_id: "director.main",
+      designation: "General Manager",
+      area: "North & East Zones",
+      office_number: "+91 11 4982 9010",
+      personal_number: "+91 98765 11101",
+      emergency_family_number: "+91 98765 11102",
+      referrals_contact: "Mr. V. K. Malhotra (Pharma Corp), Dr. S. P. Gupta",
+      official_email: "rajesh.gm@momentumpharma.com",
+      personal_email: "rajesh.sharma77@gmail.com",
+      residential_address: "B-42, Vasant Vihar, New Delhi",
+      id_documents_url: "https://docs.momentum.com/id/gm-aadhaar.pdf",
+      bank_details_url: "https://docs.momentum.com/bank/gm-icici.pdf",
+      official_id_no: "GM-101",
+      roles: ["admin", "gm"],
+      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=sharma",
     },
     {
-      id: "sarah.chen",
-      full_name: "Sarah Chen",
-      department: "Product Management",
-      position_id: "pos-po",
-      manager_id: "soheljavadeveloper",
-      roles: ["product_owner"],
-      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=sarah",
+      id: "rm.verma",
+      full_name: "Amit Verma (Regional Manager)",
+      department: "Regional Sales",
+      position_id: "pos-rm",
+      manager_id: "gm.sharma",
+      designation: "Regional Manager",
+      area: "Delhi NCR Region",
+      office_number: "+91 11 4982 9020",
+      personal_number: "+91 98765 22201",
+      emergency_family_number: "+91 98765 22202",
+      referrals_contact: "Dr. Meena Iyer, Mr. Suresh Kapoor",
+      official_email: "amit.rm@momentumpharma.com",
+      personal_email: "verma.amit@gmail.com",
+      residential_address: "C-102, Green Park Extension, New Delhi",
+      id_documents_url: "https://docs.momentum.com/id/rm-pan.pdf",
+      bank_details_url: "https://docs.momentum.com/bank/rm-axis.pdf",
+      official_id_no: "RM-201",
+      roles: ["manager", "rm"],
+      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=verma",
     },
     {
-      id: "dr.jenkins",
-      full_name: "Dr. Sarah Jenkins",
-      department: "Healthcare Operations",
-      position_id: "pos-health-mgr",
-      manager_id: "soheljavadeveloper",
-      roles: ["manager"],
-      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=jenkins",
+      id: "bm.gupta",
+      full_name: "Vikram Gupta (Business Manager)",
+      department: "Business Development",
+      position_id: "pos-bm",
+      manager_id: "rm.verma",
+      designation: "Business Manager",
+      area: "South & Central Delhi",
+      office_number: "+91 11 4982 9030",
+      personal_number: "+91 98765 33301",
+      emergency_family_number: "+91 98765 33302",
+      referrals_contact: "Dr. K. L. Chawla, Mr. Ankit Mehta",
+      official_email: "vikram.bm@momentumpharma.com",
+      personal_email: "gupta.vikram@gmail.com",
+      residential_address: "H-19, Saket, New Delhi",
+      id_documents_url: "https://docs.momentum.com/id/bm-dl.pdf",
+      bank_details_url: "https://docs.momentum.com/bank/bm-sbi.pdf",
+      official_id_no: "BM-301",
+      roles: ["manager", "bm"],
+      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=gupta",
     },
     {
-      id: "marcus.vance",
-      full_name: "Marcus Vance",
-      department: "Engineering",
-      position_id: "pos-sr-dev",
-      manager_id: "alex.rivera",
-      roles: ["developer"],
-      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=marcus",
+      id: "sm.singh",
+      full_name: "Rohan Singh (Sales Manager)",
+      department: "Sales Operations",
+      position_id: "pos-sm",
+      manager_id: "bm.gupta",
+      designation: "Sales Manager",
+      area: "South Delhi & Lajpat Nagar",
+      office_number: "+91 11 4982 9040",
+      personal_number: "+91 98765 44401",
+      emergency_family_number: "+91 98765 44402",
+      referrals_contact: "Dr. Rajiv Malhotra, Mr. Sunil Bansal",
+      official_email: "rohan.sm@momentumpharma.com",
+      personal_email: "rohan.singh99@gmail.com",
+      residential_address: "Flat 304, Greater Kailash 1, New Delhi",
+      id_documents_url: "https://docs.momentum.com/id/sm-voter.pdf",
+      bank_details_url: "https://docs.momentum.com/bank/sm-pnb.pdf",
+      official_id_no: "SM-401",
+      roles: ["manager", "sm"],
+      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=rohan",
     },
     {
-      id: "elena.rostova",
-      full_name: "Elena Rostova",
-      department: "Quality Assurance",
-      position_id: "pos-qa",
-      manager_id: "alex.rivera",
-      roles: ["developer"],
-      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=elena",
+      id: "am.kumar",
+      full_name: "Sanjay Kumar (Area Manager)",
+      department: "Territory Management",
+      position_id: "pos-am",
+      manager_id: "sm.singh",
+      designation: "Area Manager",
+      area: "Connaught Place & Central District",
+      office_number: "+91 11 4982 9050",
+      personal_number: "+91 98765 55501",
+      emergency_family_number: "+91 98765 55502",
+      referrals_contact: "Dr. Sunita Rao, Mr. Pankaj Sharma",
+      official_email: "sanjay.am@momentumpharma.com",
+      personal_email: "sanjay.kumar.pharma@gmail.com",
+      residential_address: "74, Barakhamba Road, Connaught Place, New Delhi",
+      id_documents_url: "https://docs.momentum.com/id/am-passport.pdf",
+      bank_details_url: "https://docs.momentum.com/bank/am-yesbank.pdf",
+      official_id_no: "AM-501",
+      roles: ["manager", "am"],
+      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=sanjay",
+    },
+    {
+      id: "smr.patel",
+      full_name: "Priya Patel (Sr. Medical Representative)",
+      department: "Field Operations",
+      position_id: "pos-smr",
+      manager_id: "am.kumar",
+      designation: "Sr. Medical Representative",
+      area: "Connaught Place Medical Hub",
+      office_number: "+91 11 4982 9060",
+      personal_number: "+91 98765 66601",
+      emergency_family_number: "+91 98765 66602",
+      referrals_contact: "Dr. Harsh Vardhan, Mrs. Renu Patel",
+      official_email: "priya.smr@momentumpharma.com",
+      personal_email: "patel.priya22@gmail.com",
+      residential_address: "A-12, Karol Bagh, New Delhi",
+      id_documents_url: "https://docs.momentum.com/id/smr-aadhaar.pdf",
+      bank_details_url: "https://docs.momentum.com/bank/smr-kotak.pdf",
+      official_id_no: "SMR-601",
+      roles: ["developer", "smr"],
+      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=priya",
+    },
+    {
+      id: "mr.das",
+      full_name: "Rahul Das (Medical Representative)",
+      department: "Field Operations",
+      position_id: "pos-mr",
+      manager_id: "smr.patel",
+      designation: "Medical Representative",
+      area: "Central Delhi Clinics & Chemists Zone",
+      office_number: "+91 11 4982 9070",
+      personal_number: "+91 98765 77701",
+      emergency_family_number: "+91 98765 77702",
+      referrals_contact: "Dr. B. C. Roy, Mr. Deepak Nanda",
+      official_email: "rahul.mr@momentumpharma.com",
+      personal_email: "rahul.das88@gmail.com",
+      residential_address: "D-88, Patel Nagar, New Delhi",
+      id_documents_url: "https://docs.momentum.com/id/mr-pan.pdf",
+      bank_details_url: "https://docs.momentum.com/bank/mr-canara.pdf",
+      official_id_no: "MR-701",
+      roles: ["developer", "mr"],
+      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=rahul",
     },
   ];
 
   for (const m of seedMembers) {
     await connection.query(
-      "INSERT INTO profiles (id, full_name, avatar_url, department, position_id, manager_id, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)",
-      [m.id, m.full_name, m.avatar_url, m.department, m.position_id, m.manager_id],
+      `INSERT INTO profiles (
+        id, full_name, avatar_url, department, position_id, manager_id, is_active,
+        designation, area, office_number, personal_number, emergency_family_number,
+        referrals_contact, official_email, personal_email, residential_address,
+        id_documents_url, bank_details_url, official_id_no
+      ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        m.id, m.full_name, m.avatar_url, m.department, m.position_id, m.manager_id,
+        m.designation, m.area, m.office_number, m.personal_number, m.emergency_family_number,
+        m.referrals_contact, m.official_email, m.personal_email, m.residential_address,
+        m.id_documents_url, m.bank_details_url, m.official_id_no,
+      ],
     );
     for (const role of m.roles) {
       await connection.query(
@@ -196,345 +385,309 @@ async function seedCompleteApplicationFlows(connection: mysql.PoolConnection) {
     }
   }
 
-  // 4. Teams & Members
-  const team1 = "team-core-eng";
-  const team2 = "team-health-ops";
+  // 4. Doctors Management (Drs Management Seed Data)
+  const doctors = [
+    {
+      id: "doc-swaminathan",
+      name: "Dr. Arvind Swaminathan",
+      department: "Cardiology",
+      area_locality: "Connaught Place, New Delhi",
+      whatsapp_contact: "+91 98100 12345",
+      dob: "1978-04-14",
+      spouse_dob: "1982-08-22",
+      anniversary_date: "2006-12-10",
+      child_dobs: JSON.stringify(["2008-05-18", "2012-11-04"]),
+      special_day: "Doctor's Day Special (July 1st)",
+      gift_accepted_details: "Littmann Cardio Stethoscope & Executive Leather Organiser",
+      created_by: "mr.das",
+      assigned_to: "mr.das",
+    },
+    {
+      id: "doc-sundaram",
+      name: "Dr. Meenakshi Sundaram",
+      department: "Pediatrics & Neonatology",
+      area_locality: "Greater Kailash, New Delhi",
+      whatsapp_contact: "+91 98111 54321",
+      dob: "1982-09-05",
+      spouse_dob: "1980-03-12",
+      anniversary_date: "2009-02-14",
+      child_dobs: JSON.stringify(["2011-07-20"]),
+      special_day: "Pediatric Academic Seminar Keynote",
+      gift_accepted_details: "Pediatric Pulse Oximeter & Customized Desk Pen Stand",
+      created_by: "smr.patel",
+      assigned_to: "smr.patel",
+    },
+    {
+      id: "doc-prasad",
+      name: "Dr. Rajeshwar Prasad",
+      department: "Orthopedics & Joint Replacement",
+      area_locality: "Saket, New Delhi",
+      whatsapp_contact: "+91 98188 99887",
+      dob: "1975-11-20",
+      spouse_dob: "1977-06-15",
+      anniversary_date: "2002-05-25",
+      child_dobs: JSON.stringify(["2004-01-10", "2007-09-12"]),
+      special_day: "Hospital Foundation Day (Oct 15th)",
+      gift_accepted_details: "Anatomical Bone Model & Digital BP Monitor Set",
+      created_by: "am.kumar",
+      assigned_to: "am.kumar",
+    },
+    {
+      id: "doc-chaudhury",
+      name: "Dr. Ananya Roy Chaudhury",
+      department: "Gynecology & Obstetrics",
+      area_locality: "Green Park Extension, New Delhi",
+      whatsapp_contact: "+91 98711 22334",
+      dob: "1985-01-30",
+      spouse_dob: "1983-10-18",
+      anniversary_date: "2011-11-18",
+      child_dobs: JSON.stringify(["2014-03-22"]),
+      special_day: "Women's Health Awareness Day",
+      gift_accepted_details: "Fetal Doppler Device & Premium Brand Tea Hamper",
+      created_by: "mr.das",
+      assigned_to: "mr.das",
+    },
+  ];
 
+  for (const d of doctors) {
+    await connection.query(
+      `INSERT INTO doctors (
+        id, name, department, area_locality, whatsapp_contact, dob, spouse_dob,
+        anniversary_date, child_dobs, special_day, gift_accepted_details,
+        created_by, assigned_to
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        d.id, d.name, d.department, d.area_locality, d.whatsapp_contact, d.dob, d.spouse_dob,
+        d.anniversary_date, d.child_dobs, d.special_day, d.gift_accepted_details,
+        d.created_by, d.assigned_to,
+      ]
+    );
+  }
+
+  // 5. Wholesale / Distributor / Chemists Management Seed Data
+  const tradeEntities = [
+    {
+      id: "trade-apollo-cp",
+      category: "chemist",
+      firm_name: "Apollo Pharmacy Store #482",
+      drug_license_no: "DL-20B/10492/2021",
+      gst_number: "07AAACA40921Z5",
+      address: "Shop G-12, Inner Circle, Connaught Place, New Delhi",
+      proprietor_name: "Mr. Suresh Agarwal",
+      contact_number: "+91 98102 33445",
+      email: "apollo.cp@pharmacychain.com",
+      comm_modes: "Call, WhatsApp, Email",
+      billing_details: "15 Days Credit Period with Net Billing",
+      payment_details: "HDFC Bank NEFT / UPI ID: apollo.cp@hdfcbank",
+      offer_scheme_details: "10+2 Free Scheme on Antibiotics Range",
+      created_by: "mr.das",
+      assigned_to: "mr.das",
+    },
+    {
+      id: "trade-medplus-saket",
+      category: "chemist",
+      firm_name: "MedPlus Health Services Pvt Ltd",
+      drug_license_no: "DL-21B/88491/2022",
+      gst_number: "07AAACM9912K1Z9",
+      address: "Shop 4, Main Market, Saket, New Delhi",
+      proprietor_name: "Mr. Rakesh Jain",
+      contact_number: "+91 98112 66778",
+      email: "store.saket@medplus.com",
+      comm_modes: "Call, WhatsApp",
+      billing_details: "30 Days Credit Billing",
+      payment_details: "ICICI Bank RTGS / Account # 002105001284",
+      offer_scheme_details: "5% Additional Cash Discount on Prompt 7-Day Clearance",
+      created_by: "smr.patel",
+      assigned_to: "smr.patel",
+    },
+    {
+      id: "trade-delhi-wholesale",
+      category: "wholesaler",
+      firm_name: "Delhi Pharma Wholesalers & Stockists",
+      drug_license_no: "DL-20B/W-00492",
+      gst_number: "07AAACD5541A1Z2",
+      address: "102, Bhagirath Palace, Chandni Chowk, Delhi",
+      proprietor_name: "Mr. Vijay Kumar Gupta & Sons",
+      contact_number: "+91 98180 88990",
+      email: "sales@delhipharmawholesale.com",
+      comm_modes: "Call, WhatsApp, B2B Portal",
+      billing_details: "7 Days Net Billing",
+      payment_details: "State Bank of India / Current A/C # 3049182941",
+      offer_scheme_details: "Super Stockist Tier-1 Discount (12% Wholesale Margin)",
+      created_by: "am.kumar",
+      assigned_to: "am.kumar",
+    },
+    {
+      id: "trade-northern-dist",
+      category: "distributor",
+      firm_name: "Northern India Healthcare Distributors Ltd",
+      drug_license_no: "DL-21B/DIST-882",
+      gst_number: "07AAACN1122D1Z0",
+      address: "Plot 45, Okhla Industrial Area Phase 3, New Delhi",
+      proprietor_name: "Mr. Harish Chandra Mittal",
+      contact_number: "+91 98710 44556",
+      email: "dispatch@northerndistributors.com",
+      comm_modes: "Call, Email, SAP EDI",
+      billing_details: "Advance DD / RTGS Transfer per consignment",
+      payment_details: "Axis Bank Current A/C # 912020019482019",
+      offer_scheme_details: "Annual Volume Turnover Rebate (3% Target Incentive)",
+      created_by: "bm.gupta",
+      assigned_to: "bm.gupta",
+    },
+  ];
+
+  for (const t of tradeEntities) {
+    await connection.query(
+      `INSERT INTO trade_entities (
+        id, category, firm_name, drug_license_no, gst_number, address,
+        proprietor_name, contact_number, email, comm_modes, billing_details,
+        payment_details, offer_scheme_details, created_by, assigned_to
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        t.id, t.category, t.firm_name, t.drug_license_no, t.gst_number, t.address,
+        t.proprietor_name, t.contact_number, t.email, t.comm_modes, t.billing_details,
+        t.payment_details, t.offer_scheme_details, t.created_by, t.assigned_to,
+      ]
+    );
+  }
+
+  // 6. Work Station Employee Daily Activity & Reports
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  const reports = [
+    {
+      id: "rpt-mr-das-today",
+      user_id: "mr.das",
+      report_date: todayStr,
+      doctor_visits_count: 8,
+      chemist_visits_count: 14,
+      wholesale_visits_count: 3,
+      distributor_visits_count: 1,
+      billing_amount: 85400.00,
+      payment_amount: 62000.00,
+      offers_distributed: "Sample kits of MOMENTUM-CV 625 & Executive Doctor Pen Sets",
+      special_achievements: "Converted Dr. Arvind Swaminathan for monthly 100-strip prescription commitment!",
+      notes: "All CP chemist stocking verified. Apollo Pharmacy order booked.",
+    },
+    {
+      id: "rpt-smr-patel-today",
+      user_id: "smr.patel",
+      report_date: todayStr,
+      doctor_visits_count: 10,
+      chemist_visits_count: 18,
+      wholesale_visits_count: 4,
+      distributor_visits_count: 2,
+      billing_amount: 142000.00,
+      payment_amount: 110000.00,
+      offers_distributed: "Pediatric Pulse Oximeter gifts & 10+2 chemist schemes",
+      special_achievements: "Secured MedPlus Saket order for 50 boxes of MOMENTUM-DSR capsules!",
+      notes: "Joint visit with AM Sanjay Kumar completed successfully.",
+    },
+  ];
+
+  for (const r of reports) {
+    await connection.query(
+      `INSERT INTO daily_reports (
+        id, user_id, report_date, doctor_visits_count, chemist_visits_count,
+        wholesale_visits_count, distributor_visits_count, billing_amount,
+        payment_amount, offers_distributed, special_achievements, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        r.id, r.user_id, r.report_date, r.doctor_visits_count, r.chemist_visits_count,
+        r.wholesale_visits_count, r.distributor_visits_count, r.billing_amount,
+        r.payment_amount, r.offers_distributed, r.special_achievements, r.notes,
+      ]
+    );
+  }
+
+  // 7. Pharmaceutical Products & 3D Detailing Presentation Page
+  const pharmaProducts = [
+    {
+      id: "pharma-cv-625",
+      name: "MOMENTUM-CV 625 Tablets",
+      composition: "Amoxicillin 500mg + Potassium Clavulanate 125mg",
+      category: "Antibiotics / Respiratory",
+      packaging: "10 x 1 x 10 Alu-Alu Blister Pack",
+      mrp: 245.00,
+      ptr: 165.00,
+      pts: 145.00,
+      image_url: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop",
+      detailing_presentation_url: "https://3d.momentumpharma.com/detail/cv625",
+      key_benefits: JSON.stringify([
+        "99.4% Clinical Efficacy in Upper & Lower Respiratory Tract Infections",
+        "Zero Gastric Irritation Formulated with Micro-Granules",
+        "Alu-Alu Moisture Barrier Packaging for Enhanced Shelf Life",
+      ]),
+      active_promotional_scheme: "10+2 Boxes Free + Executive Doctor Gift Set",
+    },
+    {
+      id: "pharma-dsr",
+      name: "MOMENTUM-DSR Capsules",
+      composition: "Rabeprazole Sodium 20mg + Domperidone 30mg Sustained Release",
+      category: "Gastroenterology",
+      packaging: "10 x 10 Strip Box",
+      mrp: 180.00,
+      ptr: 120.00,
+      pts: 105.00,
+      image_url: "https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=600&auto=format&fit=crop",
+      detailing_presentation_url: "https://3d.momentumpharma.com/detail/dsr",
+      key_benefits: JSON.stringify([
+        "Dual Release Technology (Instant Acid Inhibition + 24-hr Motility Control)",
+        "Rapid Relief from GERD, Heartburn, & Chronic Nausea",
+        "High Patient Compliance & Superior Safety Profile",
+      ]),
+      active_promotional_scheme: "Buy 5 Boxes Get 1 Box Free + Chemist Banner Promo",
+    },
+    {
+      id: "pharma-forte-syrup",
+      name: "MOMENTUM-FORTE Syrup",
+      composition: "Multivitamins + Essential Minerals + Antioxidants + L-Lysine",
+      category: "Nutraceuticals & Immunity",
+      packaging: "200ml Pet Bottle with Measuring Cap",
+      mrp: 165.00,
+      ptr: 108.00,
+      pts: 92.00,
+      image_url: "https://images.unsplash.com/photo-1550572017-edd951aa8f72?w=600&auto=format&fit=crop",
+      detailing_presentation_url: "https://3d.momentumpharma.com/detail/forte",
+      key_benefits: JSON.stringify([
+        "Fights Chronic Fatigue & Accelerates Post-Illness Recovery",
+        "Boosts Appetite & Natural Immune Defense Mechanisms",
+        "Delicious Mixed Fruit Flavor Preferred by All Age Groups",
+      ]),
+      active_promotional_scheme: "15+3 Launch Special Scheme + Free Doctor Sample Bottles",
+    },
+  ];
+
+  for (const p of pharmaProducts) {
+    await connection.query(
+      `INSERT INTO pharma_products (
+        id, name, composition, category, packaging, mrp, ptr, pts,
+        image_url, detailing_presentation_url, key_benefits, active_promotional_scheme
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        p.id, p.name, p.composition, p.category, p.packaging, p.mrp, p.ptr, p.pts,
+        p.image_url, p.detailing_presentation_url, p.key_benefits, p.active_promotional_scheme,
+      ]
+    );
+  }
+
+  // 8. Teams & Workflows
+  const team1 = "team-field-ops";
   await connection.query(
     "INSERT INTO teams (id, name, description, lead_id) VALUES (?, ?, ?, ?)",
-    [team1, "Core Momentum Engineering", "Primary engineering team driving platform features.", "alex.rivera"]
-  );
-
-  await connection.query(
-    "INSERT INTO teams (id, name, description, lead_id) VALUES (?, ?, ?, ?)",
-    [team2, "Healthcare Operations & Onboarding", "Specialized team managing doctor & vendor onboarding workflows.", "dr.jenkins"]
+    [team1, "Central Delhi Territory Operations", "Field sales, doctor detailing, and chemist network management.", "am.kumar"]
   );
 
   await connection.query(
     "INSERT INTO team_members (id, team_id, user_id, role) VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)",
     [
-      team1 + "-alex", team1, "alex.rivera", "manager",
-      team1 + "-marcus", team1, "marcus.vance", "developer",
-      team1 + "-elena", team1, "elena.rostova", "developer",
+      team1 + "-am", team1, "am.kumar", "manager",
+      team1 + "-smr", team1, "smr.patel", "lead",
+      team1 + "-mr", team1, "mr.das", "member",
     ]
   );
 
-  await connection.query(
-    "INSERT INTO team_members (id, team_id, user_id, role) VALUES (?, ?, ?, ?), (?, ?, ?, ?)",
-    [
-      team2 + "-jenkins", team2, "dr.jenkins", "manager",
-      team2 + "-sarah", team2, "sarah.chen", "product_owner",
-    ]
-  );
-
-  // 5. Approval Workflows & Steps
-  const wfMedical = "wf-medical-op";
-  const wfTech = "wf-tech-service";
-
-  await connection.query(
-    "INSERT INTO approval_workflows (id, name, description, entity_type, active) VALUES (?, ?, ?, ?, 1)",
-    [wfMedical, "Medical Operations & Onboarding Approval", "Multi-stage approval workflow for doctor and medical staff entity onboarding.", "product_item"]
-  );
-
-  await connection.query(
-    "INSERT INTO approval_workflows (id, name, description, entity_type, active) VALUES (?, ?, ?, ?, 1)",
-    [wfTech, "Technical Infrastructure Approval", "Approval workflow for high-impact software services and API gateways.", "product_item"]
-  );
-
-  await connection.query(
-    "INSERT INTO approval_steps (id, workflow_id, step_order, approver_type, approver_ref) VALUES (?, ?, 1, 'role', 'manager'), (?, ?, 2, 'role', 'admin')",
-    [
-      "step-med-1", wfMedical,
-      "step-med-2", wfMedical,
-    ]
-  );
-
-  await connection.query(
-    "INSERT INTO approval_steps (id, workflow_id, step_order, approver_type, approver_ref) VALUES (?, ?, 1, 'role', 'admin')",
-    ["step-tech-1", wfTech]
-  );
-
-  // 6. Form Schemas
-  const doctorFormSchema = [
-    {
-      id: "f_specialty",
-      label: "Medical Specialty / Role",
-      type: "select",
-      required: true,
-      options: ["General Practitioner", "Cardiology", "Neurology", "Pediatrics", "Surgeon", "Orthopedics"],
-    },
-    {
-      id: "f_license_no",
-      label: "Medical License Number",
-      type: "text",
-      required: true,
-      placeholder: "e.g. MD-883921",
-    },
-    {
-      id: "f_hospital",
-      label: "Hospital / Affiliation",
-      type: "text",
-      required: false,
-      placeholder: "e.g. St. Jude General",
-    },
-    {
-      id: "f_years",
-      label: "Years of Practice",
-      type: "number",
-      required: true,
-      placeholder: "10",
-    },
-  ];
-
-  const apiFormSchema = [
-    {
-      id: "f_endpoint",
-      label: "API Endpoint Base URL",
-      type: "text",
-      required: true,
-      placeholder: "https://api.momentum.com/v1/patients",
-    },
-    {
-      id: "f_rate_limit",
-      label: "Rate Limit (Requests / Min)",
-      type: "number",
-      required: true,
-      placeholder: "1000",
-    },
-    {
-      id: "f_protocol",
-      label: "Interface Protocol",
-      type: "select",
-      required: true,
-      options: ["REST API", "gRPC", "GraphQL"],
-    },
-  ];
-
-  const depSchema = [
-    {
-      id: "f_criticality",
-      label: "Dependency Criticality",
-      type: "select",
-      required: true,
-      options: ["Hard Blocker", "High Impact", "Medium", "Optional / Soft"],
-    },
-    {
-      id: "f_protocol",
-      label: "Interface Protocol",
-      type: "select",
-      required: true,
-      options: ["REST API", "gRPC", "GraphQL", "Database Link"],
-    },
-    {
-      id: "f_sla",
-      label: "Expected SLA / Latency Threshold",
-      type: "text",
-      required: false,
-      placeholder: "< 50ms, 99.99% uptime",
-    },
-  ];
-
-  await connection.query(
-    "INSERT INTO product_form_schemas (id, name, schema_type, fields, is_active) VALUES (?, ?, 'onboarding', ?, 1), (?, ?, 'dependency', ?, 1)",
-    [
-      "schema-doc-onboarding", "Doctor Entity Onboarding Form Schema", JSON.stringify(doctorFormSchema),
-      "schema-dep-std", "Standard Product Dependency Schema", JSON.stringify(depSchema),
-    ]
-  );
-
-  // 7. Product Definitions (Templates e.g. Doctor, Patient REST API Gateway)
-  const prodDoctorId = "prod-doctor";
-  const prodApiId = "prod-api-service";
-
-  await connection.query(
-    `INSERT INTO products (id, name, slug, product_type, category, sku, status, form_schema, approval_settings, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
-    [
-      prodDoctorId,
-      "Doctor",
-      "doctor",
-      "Entity Onboarding",
-      "Healthcare",
-      "MED-DOC-001",
-      JSON.stringify(doctorFormSchema),
-      JSON.stringify({ require_approval: true, workflow_id: wfMedical, workflow_name: "Medical Operations & Onboarding Approval" }),
-      "sarah.chen",
-    ]
-  );
-
-  await connection.query(
-    `INSERT INTO products (id, name, slug, product_type, category, sku, status, form_schema, approval_settings, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
-    [
-      prodApiId,
-      "Patient REST API Gateway",
-      "patient-rest-api-gateway",
-      "Software Service",
-      "Software Platform",
-      "SW-API-8080",
-      JSON.stringify(apiFormSchema),
-      JSON.stringify({ require_approval: false }),
-      "alex.rivera",
-    ]
-  );
-
-  // 8. Product Dependencies
-  await connection.query(
-    `INSERT INTO product_dependencies (id, product_id, depends_on_product_id, dependency_type, custom_fields)
-     VALUES (?, ?, ?, 'prerequisite', ?)`,
-    [
-      "pdep-doc-api",
-      prodDoctorId,
-      prodApiId,
-      JSON.stringify({ f_criticality: "Hard Blocker", f_protocol: "REST API", f_sla: "99.99% Uptime" }),
-    ]
-  );
-
-  // 9. Product Onboarding Tasks
-  const ptaskId = "ptask-doctor-batch";
-  await connection.query(
-    `INSERT INTO product_tasks (id, title, description, target_quantity, onboarded_count, status, assigned_to)
-     VALUES (?, ?, ?, 5, 2, 'in_progress', ?)`,
-    [ptaskId, "Onboard 5 Regional Clinic Doctors", "Onboard qualified medical specialists for the new Midwest Healthcare Wing.", "dr.jenkins"]
-  );
-
-  // 10. Product Items (Onboarded Records)
-  const pitem1Id = "pitem-sarah-connor";
-  const pitem2Id = "pitem-robert-chen";
-  const apreqId = "apreq-robert-chen";
-
-  // Item 1: Onboarded (Auto-approved / approved)
-  await connection.query(
-    `INSERT INTO product_items (id, product_id, item_name, status, task_id, custom_fields, created_by)
-     VALUES (?, ?, ?, 'onboarded', ?, ?, ?)`,
-    [
-      pitem1Id,
-      prodDoctorId,
-      "Dr. Sarah Connor",
-      ptaskId,
-      JSON.stringify({ f_specialty: "Cardiology", f_license_no: "MD-883921", f_hospital: "St. Jude General", f_years: 12 }),
-      "dr.jenkins",
-    ]
-  );
-
-  // Item 2: Pending Approval
-  await connection.query(
-    `INSERT INTO product_items (id, product_id, item_name, status, approval_request_id, task_id, custom_fields, created_by)
-     VALUES (?, ?, ?, 'pending_approval', ?, ?, ?, ?)`,
-    [
-      pitem2Id,
-      prodDoctorId,
-      "Dr. Robert Chen",
-      apreqId,
-      ptaskId,
-      JSON.stringify({ f_specialty: "Neurology", f_license_no: "MD-992341", f_hospital: "Mercy General", f_years: 8 }),
-      "sarah.chen",
-    ]
-  );
-
-  // 11. Approval Request for Item 2
-  await connection.query(
-    `INSERT INTO approval_requests (id, workflow_id, requester_id, entity_type, entity_id, title, description, status, current_step, current_step_order)
-     VALUES (?, ?, ?, 'product_item', ?, ?, ?, 'pending', 1, 1)`,
-    [
-      apreqId,
-      wfMedical,
-      "sarah.chen",
-      pitem2Id,
-      "Onboarding Approval for Dr. Robert Chen (Doctor)",
-      "Medical staff onboarding submission under Doctor product definition [Category: Healthcare]",
-    ]
-  );
-
-  // 12. Sprints, Epics, and Agile Tasks
-  const epic1Id = "epic-onboarding-v2";
-  const epic2Id = "epic-infra";
-  const sprint1Id = "sprint-10";
-
-  await connection.query(
-    "INSERT INTO epics (id, name, title, description, status, team_id) VALUES (?, ?, ?, ?, 'in_progress', ?), (?, ?, ?, ?, 'in_progress', ?)",
-    [
-      epic1Id, "Healthcare Onboarding Platform v2", "Healthcare Onboarding Platform v2", "Revamp entity onboarding for doctors, clinics, and approval routing.", team2,
-      epic2Id, "High Availability Infrastructure", "High Availability Infrastructure", "Upgrade API gateways, SLA monitoring, and performance telemetry.", team1,
-    ]
-  );
-
-  await connection.query(
-    "INSERT INTO sprints (id, name, title, goal, status, start_date, end_date, target_points) VALUES (?, ?, ?, ?, 'active', NOW(), DATE_ADD(NOW(), INTERVAL 14 DAY), 30)",
-    [sprint1Id, "Sprint 10 - Healthcare Onboarding & Core Engine", "Sprint 10 - Healthcare Onboarding & Core Engine", "Complete Doctor entity onboarding flow, custom form builders, and approval sync."]
-  );
-
-  const agileTasks = [
-    {
-      id: "task-101",
-      title: "Implement Dynamic Doctor Form Builder & Custom Schemas",
-      description: "Build interactive form schema editor supporting text, number, select, date, and textarea inputs.",
-      status: "done",
-      points: 5,
-      assignee_id: "marcus.vance",
-      epic_id: epic1Id,
-      sprint_id: sprint1Id,
-      team_id: team1,
-    },
-    {
-      id: "task-102",
-      title: "Connect Onboarding Approval Engine to Product Items",
-      description: "Ensure approving or rejecting requests in /approvals automatically syncs product_items status.",
-      status: "done",
-      points: 8,
-      assignee_id: "alex.rivera",
-      epic_id: epic1Id,
-      sprint_id: sprint1Id,
-      team_id: team1,
-    },
-    {
-      id: "task-103",
-      title: "Perform End-to-End System Audit & Seed Complete Flows",
-      description: "Verify complete workflow from Sprints to Product Onboarding and Approval routing.",
-      status: "in_progress",
-      points: 5,
-      assignee_id: "soheljavadeveloper",
-      epic_id: epic1Id,
-      sprint_id: sprint1Id,
-      team_id: team2,
-    },
-    {
-      id: "task-104",
-      title: "Setup Automated Sprint Burndown & KPI Telemetry",
-      description: "Compute ideal vs actual burndown points dynamically for active sprint dashboard.",
-      status: "todo",
-      points: 3,
-      assignee_id: "elena.rostova",
-      epic_id: epic2Id,
-      sprint_id: sprint1Id,
-      team_id: team1,
-    },
-  ];
-
-  for (const t of agileTasks) {
-    await connection.query(
-      `INSERT INTO tasks (id, title, description, status, points, assignee_id, epic_id, sprint_id, team_id, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'soheljavadeveloper')`,
-      [t.id, t.title, t.description, t.status, t.points, t.assignee_id, t.epic_id, t.sprint_id, t.team_id]
-    );
-  }
-
-  // 13. Appreciations
-  await connection.query(
-    `INSERT INTO appreciations (id, sender_id, recipient_id, from_user, to_user, message, badge_type)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [
-      "appr-1",
-      "sarah.chen",
-      "alex.rivera",
-      "sarah.chen",
-      "alex.rivera",
-      "Awesome work finalizing the Doctor onboarding form schema and approval engine!",
-      "Leadership",
-    ]
-  );
-
-  console.log("[MySQL Backend] Complete application flows successfully seeded! Sprints, Epics, Tasks, Products, Onboarding, Approvals, Hierarchy, and Appreciations are 100% ready.");
+  console.log("[MySQL Backend] Complete Working Pyramid Hierarchy, Doctors, Trade Entities, Daily Reports & 3D Detailing Products successfully seeded!");
 }
 
 export async function initDb() {
@@ -544,7 +697,7 @@ export async function initDb() {
     const connection = await pool.getConnection();
     console.log("[MySQL Backend] Connected to MySQL database pool successfully.");
 
-    // Create Tables
+    // Create Core Tables
     await connection.query(`
       CREATE TABLE IF NOT EXISTS profiles (
         id VARCHAR(36) PRIMARY KEY,
@@ -553,6 +706,18 @@ export async function initDb() {
         department VARCHAR(255),
         position_id VARCHAR(36),
         manager_id VARCHAR(36),
+        designation VARCHAR(255),
+        area VARCHAR(255),
+        office_number VARCHAR(50),
+        personal_number VARCHAR(50),
+        emergency_family_number VARCHAR(50),
+        referrals_contact TEXT,
+        official_email VARCHAR(255),
+        personal_email VARCHAR(255),
+        residential_address TEXT,
+        id_documents_url TEXT,
+        bank_details_url TEXT,
+        official_id_no VARCHAR(100),
         is_active TINYINT(1) DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -580,6 +745,84 @@ export async function initDb() {
         id VARCHAR(36) PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
         department VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS doctors (
+        id VARCHAR(36) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        department VARCHAR(255) NOT NULL,
+        area_locality VARCHAR(255) NOT NULL,
+        whatsapp_contact VARCHAR(50) NOT NULL,
+        dob DATE,
+        spouse_dob DATE,
+        anniversary_date DATE,
+        child_dobs JSON,
+        special_day VARCHAR(255),
+        gift_accepted_details TEXT,
+        created_by VARCHAR(36) NOT NULL,
+        assigned_to VARCHAR(36) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS trade_entities (
+        id VARCHAR(36) PRIMARY KEY,
+        category VARCHAR(50) NOT NULL,
+        firm_name VARCHAR(255) NOT NULL,
+        drug_license_no VARCHAR(100) NOT NULL,
+        gst_number VARCHAR(50) NOT NULL,
+        address TEXT NOT NULL,
+        proprietor_name VARCHAR(255) NOT NULL,
+        contact_number VARCHAR(50) NOT NULL,
+        email VARCHAR(255),
+        comm_modes VARCHAR(255),
+        billing_details TEXT,
+        payment_details TEXT,
+        offer_scheme_details TEXT,
+        created_by VARCHAR(36) NOT NULL,
+        assigned_to VARCHAR(36) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS daily_reports (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL,
+        report_date DATE NOT NULL,
+        doctor_visits_count INT DEFAULT 0,
+        chemist_visits_count INT DEFAULT 0,
+        wholesale_visits_count INT DEFAULT 0,
+        distributor_visits_count INT DEFAULT 0,
+        billing_amount DECIMAL(12, 2) DEFAULT 0.00,
+        payment_amount DECIMAL(12, 2) DEFAULT 0.00,
+        offers_distributed TEXT,
+        special_achievements TEXT,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS pharma_products (
+        id VARCHAR(36) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        composition VARCHAR(255),
+        category VARCHAR(100),
+        packaging VARCHAR(100),
+        mrp DECIMAL(10, 2),
+        ptr DECIMAL(10, 2),
+        pts DECIMAL(10, 2),
+        image_url TEXT,
+        detailing_presentation_url TEXT,
+        key_benefits JSON,
+        active_promotional_scheme TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
@@ -759,17 +1002,6 @@ export async function initDb() {
     `);
 
     await connection.query(`
-      CREATE TABLE IF NOT EXISTS product_dependencies (
-        id VARCHAR(36) PRIMARY KEY,
-        product_id VARCHAR(36) NOT NULL,
-        depends_on_product_id VARCHAR(36) NOT NULL,
-        dependency_type VARCHAR(100) DEFAULT 'prerequisite',
-        custom_fields JSON,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `);
-
-    await connection.query(`
       CREATE TABLE IF NOT EXISTS appreciations (
         id VARCHAR(36) PRIMARY KEY,
         sender_id VARCHAR(36) NOT NULL,
@@ -780,52 +1012,19 @@ export async function initDb() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // Ensure columns exist on existing tables
-    await addColumnIfNotExist(connection, "products", "product_type", "VARCHAR(100) DEFAULT 'Entity Onboarding'");
-    await addColumnIfNotExist(connection, "products", "category", "VARCHAR(100) DEFAULT 'General'");
-    await addColumnIfNotExist(connection, "products", "form_schema", "JSON");
-    await addColumnIfNotExist(connection, "products", "approval_settings", "JSON");
-    await addColumnIfNotExist(connection, "products", "sku", "VARCHAR(100)");
-    await addColumnIfNotExist(connection, "products", "status", "VARCHAR(50) DEFAULT 'active'");
-    await addColumnIfNotExist(connection, "products", "task_id", "VARCHAR(36)");
-    await addColumnIfNotExist(connection, "products", "custom_fields", "JSON");
-    await addColumnIfNotExist(connection, "products", "created_by", "VARCHAR(36)");
-    await addColumnIfNotExist(connection, "products", "slug", "VARCHAR(255) NULL");
-
-    await addColumnIfNotExist(connection, "product_items", "approval_request_id", "VARCHAR(36)");
-    await addColumnIfNotExist(connection, "product_items", "task_id", "VARCHAR(36)");
-    await addColumnIfNotExist(connection, "product_items", "custom_fields", "JSON");
-    await addColumnIfNotExist(connection, "product_items", "status", "VARCHAR(50) DEFAULT 'onboarded'");
-
-    await addColumnIfNotExist(connection, "epics", "name", "VARCHAR(255) DEFAULT ''");
-    await addColumnIfNotExist(connection, "epics", "title", "VARCHAR(255) DEFAULT ''");
-    await addColumnIfNotExist(connection, "epics", "team_id", "VARCHAR(36)");
-
-    await addColumnIfNotExist(connection, "sprints", "name", "VARCHAR(255) DEFAULT ''");
-    await addColumnIfNotExist(connection, "sprints", "title", "VARCHAR(255) DEFAULT ''");
-    await addColumnIfNotExist(connection, "sprints", "goal", "TEXT");
-    await addColumnIfNotExist(connection, "sprints", "start_date", "DATETIME");
-    await addColumnIfNotExist(connection, "sprints", "end_date", "DATETIME");
-    await addColumnIfNotExist(connection, "sprints", "target_points", "INT DEFAULT 0");
-    await addColumnIfNotExist(connection, "sprints", "completed_points", "INT DEFAULT 0");
-
-    await addColumnIfNotExist(connection, "approval_requests", "current_step_order", "INT DEFAULT 1");
-    await addColumnIfNotExist(connection, "approval_requests", "current_step", "INT DEFAULT 1");
-    await addColumnIfNotExist(connection, "approval_requests", "entity_type", "VARCHAR(100) DEFAULT 'task'");
-
-    await addColumnIfNotExist(connection, "tasks", "assignee_id", "VARCHAR(36)");
-    await addColumnIfNotExist(connection, "tasks", "epic_id", "VARCHAR(36)");
-    await addColumnIfNotExist(connection, "tasks", "sprint_id", "VARCHAR(36)");
-    await addColumnIfNotExist(connection, "tasks", "team_id", "VARCHAR(36)");
-    await addColumnIfNotExist(connection, "tasks", "points", "INT DEFAULT 0");
-    await addColumnIfNotExist(connection, "tasks", "created_by", "VARCHAR(36)");
-
-    await addColumnIfNotExist(connection, "appreciations", "sender_id", "VARCHAR(36)");
-    await addColumnIfNotExist(connection, "appreciations", "recipient_id", "VARCHAR(36)");
-    await addColumnIfNotExist(connection, "appreciations", "from_user", "VARCHAR(255) NULL");
-    await addColumnIfNotExist(connection, "appreciations", "to_user", "VARCHAR(255) NULL");
-    await addColumnIfNotExist(connection, "appreciations", "message", "TEXT");
-    await addColumnIfNotExist(connection, "appreciations", "badge_type", "VARCHAR(100) DEFAULT 'Excellence'");
+    // Ensure extended profile columns exist
+    await addColumnIfNotExist(connection, "profiles", "designation", "VARCHAR(255)");
+    await addColumnIfNotExist(connection, "profiles", "area", "VARCHAR(255)");
+    await addColumnIfNotExist(connection, "profiles", "office_number", "VARCHAR(50)");
+    await addColumnIfNotExist(connection, "profiles", "personal_number", "VARCHAR(50)");
+    await addColumnIfNotExist(connection, "profiles", "emergency_family_number", "VARCHAR(50)");
+    await addColumnIfNotExist(connection, "profiles", "referrals_contact", "TEXT");
+    await addColumnIfNotExist(connection, "profiles", "official_email", "VARCHAR(255)");
+    await addColumnIfNotExist(connection, "profiles", "personal_email", "VARCHAR(255)");
+    await addColumnIfNotExist(connection, "profiles", "residential_address", "TEXT");
+    await addColumnIfNotExist(connection, "profiles", "id_documents_url", "TEXT");
+    await addColumnIfNotExist(connection, "profiles", "bank_details_url", "TEXT");
+    await addColumnIfNotExist(connection, "profiles", "official_id_no", "VARCHAR(100)");
 
     // Check if profiles exist. If database is fresh, run full seed.
     const [existingProfiles] = await connection.query<mysql.RowDataPacket[]>(

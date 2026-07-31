@@ -16,6 +16,10 @@ import {
   GitBranch,
   ShieldCheck,
   Package,
+  Stethoscope,
+  Store,
+  Briefcase,
+  Sparkles,
 } from "lucide-react";
 import {
   Sidebar,
@@ -36,6 +40,10 @@ import { useMyAccess } from "@/hooks/use-my-access";
 
 const main = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Doctors Management", url: "/doctors", icon: Stethoscope },
+  { title: "Trade & Chemists", url: "/trade", icon: Store },
+  { title: "Workstation Activity", url: "/workstation", icon: Briefcase },
+  { title: "3D Product Detailing", url: "/detailing", icon: Sparkles },
   { title: "Products", url: "/products", icon: Package },
   { title: "My Performance", url: "/performance", icon: TrendingUp },
   { title: "Tasks", url: "/tasks", icon: CheckSquare },
