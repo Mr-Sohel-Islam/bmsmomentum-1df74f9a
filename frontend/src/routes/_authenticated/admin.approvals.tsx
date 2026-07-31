@@ -20,6 +20,7 @@ import {
   APPROVER_TYPES,
 } from "@/lib/approvals.functions";
 import { listUsers, PERMISSIONS, ROLES } from "@/lib/admin.functions";
+import { AdminGuard } from "@/components/admin-guard";
 
 interface Step {
   id: string;
@@ -112,7 +113,8 @@ function AdminApprovalsPage() {
   const [entity, setEntity] = useState<string>("task");
 
   return (
-    <div className="space-y-8 p-6 md:p-10">
+    <AdminGuard>
+      <div className="space-y-8 p-6 md:p-10">
       <div>
         <p className="font-mono text-xs uppercase tracking-widest text-primary">Admin</p>
         <h1 className="mt-2 flex items-center gap-2 text-3xl font-bold tracking-tight">
@@ -227,6 +229,7 @@ function AdminApprovalsPage() {
         ))}
       </div>
     </div>
+    </AdminGuard>
   );
 }
 

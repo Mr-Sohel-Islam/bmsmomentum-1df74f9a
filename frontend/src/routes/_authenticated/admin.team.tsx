@@ -40,6 +40,7 @@ import { listTeamScores, recordScore, deleteScore } from "@/lib/performance.func
 import { listMetrics, listUsers } from "@/lib/admin.functions";
 import { listTeams, createTeam, deleteTeam, delegatePower, type Team } from "@/lib/teams.functions";
 import { RolePermissionMatrix } from "@/components/role-permission-matrix";
+import { AdminGuard } from "@/components/admin-guard";
 
 type UserOption = {
   id: string;
@@ -127,7 +128,8 @@ function TeamPage() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 p-6 md:p-10">
+    <AdminGuard>
+      <div className="mx-auto max-w-6xl space-y-8 p-6 md:p-10">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-primary">
@@ -234,6 +236,7 @@ function TeamPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </AdminGuard>
   );
 }
 

@@ -42,6 +42,8 @@ import {
   type Role,
 } from "@/lib/admin.functions";
 
+import { AdminGuard } from "@/components/admin-guard";
+
 export const Route = createFileRoute("/_authenticated/admin/users")({
   head: () => ({
     meta: [
@@ -74,7 +76,8 @@ function UsersPage() {
   const { data: positions } = useQuery({ queryKey: ["positions"], queryFn: () => listPos() });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 p-6 md:p-10">
+    <AdminGuard>
+      <div className="mx-auto max-w-6xl space-y-8 p-6 md:p-10">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-primary">Admin</p>
@@ -102,6 +105,7 @@ function UsersPage() {
         )}
       </div>
     </div>
+  </AdminGuard>
   );
 }
 

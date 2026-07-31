@@ -15,8 +15,8 @@ export const listTeamScores = createServerFn({ method: "GET" }).handler(async ()
 });
 
 const scoreInput = z.object({
-  user_id: z.string().uuid(),
-  metric_id: z.string().uuid(),
+  user_id: z.string().min(1),
+  metric_id: z.string().min(1),
   value: z.number(),
   period: z.string().min(1).max(20),
 });
@@ -31,7 +31,7 @@ export const recordScore = createServerFn({ method: "POST" })
   });
 
 export const deleteScore = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/metrics/scores/${data.id}`);
   });
@@ -47,7 +47,7 @@ export const sendAppreciation = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        to_user: z.string().uuid(),
+        to_user: z.string().min(1),
         message: z.string().min(1).max(500),
         points: z.number().int().min(1).max(100).default(5),
       })
@@ -183,7 +183,7 @@ export const sharePerformance = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        recipients: z.array(z.string().uuid()).min(1).max(25),
+        recipients: z.array(z.string().min(1)).min(1).max(25),
         period: z.string().min(1).max(20),
         note: z.string().max(1000).optional().nullable(),
         snapshot: z.record(z.string(), z.unknown()).default({}),

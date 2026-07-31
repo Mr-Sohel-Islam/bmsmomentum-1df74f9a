@@ -39,7 +39,7 @@ export const updateWorkflow = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        id: z.string().uuid(),
+        id: z.string().min(1),
         name: z.string().min(1).max(120).optional(),
         active: z.boolean().optional(),
       })
@@ -51,7 +51,7 @@ export const updateWorkflow = createServerFn({ method: "POST" })
   });
 
 export const deleteWorkflow = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/approval/workflows/${data.id}`);
   });
@@ -60,7 +60,7 @@ export const addStep = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        workflow_id: z.string().uuid(),
+        workflow_id: z.string().min(1),
         approver_type: z.enum(APPROVER_TYPES),
         approver_ref: z.string().max(120).optional().nullable(),
       })
@@ -75,7 +75,7 @@ export const addStep = createServerFn({ method: "POST" })
   });
 
 export const deleteStep = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/approval/steps/${data.id}`);
   });
@@ -95,7 +95,7 @@ export const decideRequest = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        request_id: z.string().uuid(),
+        request_id: z.string().min(1),
         decision: z.enum(["approved", "rejected"]),
         note: z.string().max(500).optional().nullable(),
       })

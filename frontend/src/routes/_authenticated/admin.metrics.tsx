@@ -30,6 +30,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { listMetrics, createMetric, updateMetric, deleteMetric } from "@/lib/admin.functions";
+import { AdminGuard } from "@/components/admin-guard";
 
 export const Route = createFileRoute("/_authenticated/admin/metrics")({
   head: () => ({
@@ -55,7 +56,8 @@ function MetricsPage() {
   const { data, isLoading } = useQuery({ queryKey: ["metrics"], queryFn: () => list() });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 p-6 md:p-10">
+    <AdminGuard>
+      <div className="mx-auto max-w-6xl space-y-8 p-6 md:p-10">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-primary">Admin</p>
@@ -124,6 +126,7 @@ function MetricsPage() {
         ))}
       </div>
     </div>
+    </AdminGuard>
   );
 }
 

@@ -30,7 +30,7 @@ export const createTeam = createServerFn({ method: "POST" })
       .object({
         name: z.string().min(2).max(100),
         description: z.string().max(500).optional().nullable(),
-        lead_id: z.string().uuid().optional().nullable(),
+        lead_id: z.string().min(1).optional().nullable(),
       })
       .parse(d),
   )
@@ -39,7 +39,7 @@ export const createTeam = createServerFn({ method: "POST" })
   });
 
 export const deleteTeam = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/teams/${data.id}`);
   });
@@ -48,8 +48,8 @@ export const addTeamMember = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        team_id: z.string().uuid(),
-        user_id: z.string().uuid(),
+        team_id: z.string().min(1),
+        user_id: z.string().min(1),
         role: z.enum(["lead", "manager", "member", "reviewer"]).default("member"),
       })
       .parse(d),
@@ -62,17 +62,23 @@ export const addTeamMember = createServerFn({ method: "POST" })
   });
 
 export const removeTeamMember = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        team_id: z.string().min(1),
+        user_id: z.string().min(1),
+      })
+      .parse(d),
+  )
   .handler(async ({ data }) => {
-    // Note: data.id can be team_id or member ID; if passed team_id & user_id or id:
-    return apiClient.delete<{ success: boolean }>(`/teams/${data.id}/members/${data.id}`);
+    return apiClient.delete<{ success: boolean }>(`/teams/${data.team_id}/members/${data.user_id}`);
   });
 
 export const delegatePower = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        user_id: z.string().uuid(),
+        user_id: z.string().min(1),
         role: z.enum(["super_admin", "admin", "manager", "member"]),
         permissions: z.array(z.string()).optional(),
       })

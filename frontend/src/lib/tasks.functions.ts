@@ -78,11 +78,11 @@ export type EstimateUnit = (typeof ESTIMATE_UNITS)[number];
 const taskInput = z.object({
   title: z.string().min(1).max(160),
   description: z.string().max(2000).optional().nullable(),
-  assignee_id: z.string().uuid().optional().nullable(),
-  team_id: z.string().uuid().optional().nullable(),
-  epic_id: z.string().uuid().optional().nullable(),
-  sprint_id: z.string().uuid().optional().nullable(),
-  story_id: z.string().uuid().optional().nullable(),
+  assignee_id: z.string().min(1).optional().nullable(),
+  team_id: z.string().min(1).optional().nullable(),
+  epic_id: z.string().min(1).optional().nullable(),
+  sprint_id: z.string().min(1).optional().nullable(),
+  story_id: z.string().min(1).optional().nullable(),
   status: z.enum(TASK_STATUSES).default("todo"),
   priority: z.enum(TASK_PRIORITIES).default("medium"),
   points: z.number().int().min(0).max(1000).default(0),
@@ -124,14 +124,14 @@ export const createTask = createServerFn({ method: "POST" })
   });
 
 export const updateTask = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => taskInput.partial().extend({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => taskInput.partial().extend({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     const { id, ...patch } = data;
     return apiClient.put<Task>(`/tasks/${id}`, patch);
   });
 
 export const deleteTask = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/tasks/${data.id}`);
   });
@@ -140,9 +140,9 @@ export const bulkAssignTasks = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        task_ids: z.array(z.string().uuid()).min(1),
-        assignee_id: z.string().uuid().optional().nullable(),
-        team_id: z.string().uuid().optional().nullable(),
+        task_ids: z.array(z.string().min(1)).min(1),
+        assignee_id: z.string().min(1).optional().nullable(),
+        team_id: z.string().min(1).optional().nullable(),
       })
       .parse(d),
   )
@@ -158,7 +158,7 @@ export const bulkUpdateStatus = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        task_ids: z.array(z.string().uuid()).min(1),
+        task_ids: z.array(z.string().min(1)).min(1),
         status: z.enum(TASK_STATUSES),
       })
       .parse(d),
@@ -174,7 +174,7 @@ export const bulkUpdateTaskStatus = bulkUpdateStatus;
 
 export const bulkDeleteTasks = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
-    z.object({ task_ids: z.array(z.string().uuid()).min(1) }).parse(d),
+    z.object({ task_ids: z.array(z.string().min(1)).min(1) }).parse(d),
   )
   .handler(async ({ data }) => {
     return apiClient.post<{ count: number }>("/tasks/bulk-delete", {
@@ -231,8 +231,8 @@ export const createStory = createServerFn({ method: "POST" })
       .object({
         title: z.string().min(1).max(160),
         description: z.string().max(1000).optional().nullable(),
-        epic_id: z.string().uuid().optional().nullable(),
-        sprint_id: z.string().uuid().optional().nullable(),
+        epic_id: z.string().min(1).optional().nullable(),
+        sprint_id: z.string().min(1).optional().nullable(),
         points: z.number().int().min(0).max(100).default(0),
         status: z.enum(["backlog", "in_progress", "review", "done"]).default("backlog"),
       })
@@ -243,7 +243,7 @@ export const createStory = createServerFn({ method: "POST" })
   });
 
 export const listTaskComments = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => z.object({ task_id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ task_id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.get<any[]>(`/tasks/${data.task_id}/comments`);
   });
@@ -252,7 +252,7 @@ export const addTaskComment = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        task_id: z.string().uuid(),
+        task_id: z.string().min(1),
         body: z.string().min(1).max(2000),
       })
       .parse(d),

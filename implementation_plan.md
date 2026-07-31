@@ -1,92 +1,55 @@
-# End-to-End Workflow Audit & Application Optimization Plan
+# End-to-End System Configuration & Loophole Elimination Plan
 
-This document presents a comprehensive audit of the application workflows across **Sprints/Tasks**, **Product Onboarding**, **Employee & Team Management**, **Resource Planning**, and **Approval Workflows**. It identifies critical loopholes, cross-module integration gaps, and performance optimizations, followed by a systematic action plan.
-
----
-
-## 🔍 Application Audit & Workflow Map
-
-```mermaid
-flowchart TD
-    subgraph Sprint & Task Management
-        A[Sprint Backlog] --> B[Kanban Tasks]
-        B --> C[Burndown Chart]
-    end
-
-    subgraph Product Onboarding
-        D[Define Product e.g. Doctor] --> E[Custom Form Schema]
-        E --> F[Onboard Item e.g. Dr. Smith]
-    end
-
-    subgraph Approvals System
-        F -->|Requires Approval| G[Create Approval Request]
-        G --> H[Admin / Manager Review]
-        H -->|Approve/Reject| I[Sync Entity Status]
-    end
-
-    subgraph Employee & Team Management
-        J[User Profiles & Roles] --> K[Team Positions & Hierarchy]
-        K --> H
-    end
-
-    I -.->|Approved| L[Onboarded Record Active]
-    I -.->|Rejected| M[Onboarded Record Rejected]
-```
+This plan details the end-to-end configuration and fixes required to eliminate all loopholes, `400 Bad Request` validation crashes, `404 Not Found` endpoint mismatches, and `undefined` field errors across the entire BMS MOMENTUM platform.
 
 ---
 
-## 🐞 Discovered Loopholes & Bugs
+## 🔍 Code Audit Findings
 
-### 1. [P0] Approval System -> Product Item Status Desynchronization
-- **Issue**: When an approval request for a `product_item` is approved or rejected in `/approvals` or `/admin/approvals`, `approval_requests.status` is updated, but `product_items.status` remains stuck in `pending_approval`.
-- **Root Cause**: `ApprovalModel.recordAction` does not check or trigger entity status callbacks for linked `product_items` upon final decision.
-- **Fix**: Add entity sync logic in `ApprovalModel.recordAction` to update `product_items.status` to `onboarded` (when final approval step completes) or `rejected` (when rejected).
+### 1. [P0] Zod UUID Schema Validation Rejection of Non-UUID / Seeded Entity IDs
+- **Issue**: TanStack server functions in `frontend/src/lib/` (`approvals.functions.ts`, `tasks.functions.ts`, `admin.functions.ts`, `performance.functions.ts`, `teams.functions.ts`) enforced `z.string().uuid()` on all ID inputs.
+- **Root Cause**: Database seeds and entity creation use readable string slugs and prefixed IDs (e.g. `soheljavadeveloper`, `alex.rivera`, `pos-admin`, `wf-medical-op`, `apreq-robert-chen`, `team-core-eng`, `task-101`, `sprint-10`, `epic-onboarding-v2`). Passing these valid IDs caused Zod parsing exceptions, resulting in `400 Bad Request` or function invocation failures before reaching the backend API.
+- **Fix**: Replace `z.string().uuid()` with `z.string().min(1)` across all TanStack server functions in `frontend/src/lib/`.
 
-### 2. [P1] Product Definition Deletion & Orphaned Items Cleanup
-- **Issue**: Deleting a Product Definition deleted items from `product_items`, but did not resolve linked pending approval requests (`approval_requests`) for those deleted items.
-- **Fix**: Update `ProductModel.deleteProduct` and `deleteProductItem` to clean up associated `approval_requests`.
+### 2. [P1] Team Member Removal Parameter Mismatch
+- **Issue**: `removeTeamMember` in `frontend/src/lib/teams.functions.ts` called `/teams/${data.id}/members/${data.id}`, which failed with `404 Not Found`.
+- **Root Cause**: Backend route `DELETE /api/teams/:id/members/:userId` expects a separate `team_id` and `user_id`.
+- **Fix**: Update `removeTeamMember` schema in `teams.functions.ts` to take `{ team_id: string, user_id: string }` and construct URL `/teams/${data.team_id}/members/${data.user_id}`.
 
-### 3. [P1] Dynamic Form Renderer Validation Edge Cases
-- **Issue**: When custom fields are marked `required: true` in `DynamicFormRenderer`, empty string or unchecked boolean values could bypass validation depending on field type.
-- **Fix**: Enhance validation checks in `DynamicFormRenderer` for text, number, select, and date input types.
-
-### 4. [P2] Sprint Burndown & Task Completion Counter Sync
-- **Issue**: Completing a task linked to a Product Onboarding Task updated `product_tasks.onboarded_count`, but did not automatically set task status to `completed` if `onboarded_count` equaled `target_quantity` via direct task edits.
-- **Fix**: Normalize task quantity check in `task.routes.ts` and `product.routes.ts`.
+### 3. [P1] Approval Engine & Entity Status Synchronization
+- **Issue**: Approval/Rejection actions on product onboarding requests must automatically update `product_items.status` to `onboarded` or `rejected` and increment linked `product_tasks.onboarded_count`.
+- **Fix**: Verified and ensured real-time status update in `ApprovalModel.recordAction` (`backend/models/approval.model.ts`).
 
 ---
 
-## 🛠️ Proposed Fixes
+## 🛠️ Proposed Changes
 
-### [Component 1] Approval & Entity Status Sync (`backend/models/approval.model.ts`)
-#### [MODIFY] [approval.model.ts](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/backend/models/approval.model.ts)
-- Update `recordAction` to inspect the workflow steps count.
-- If approved on final step: set `approval_requests.status = 'approved'` AND `product_items.status = 'onboarded'`.
-- If rejected: set `approval_requests.status = 'rejected'` AND `product_items.status = 'rejected'`.
+### [Frontend Server Functions] (`frontend/src/lib/`)
 
----
+#### [MODIFY] [approvals.functions.ts](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/frontend/src/lib/approvals.functions.ts)
+- Change `z.string().uuid()` to `z.string().min(1)` for `id`, `workflow_id`, `request_id`.
 
-### [Component 2] Product Model Cleanup (`backend/models/product.model.ts`)
-#### [MODIFY] [product.model.ts](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/backend/models/product.model.ts)
-- Update `deleteProductItem` to delete associated `approval_requests`.
-- Ensure clean foreign key handling for product dependencies and items.
+#### [MODIFY] [tasks.functions.ts](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/frontend/src/lib/tasks.functions.ts)
+- Change `z.string().uuid()` to `z.string().min(1)` for `id`, `assignee_id`, `team_id`, `epic_id`, `sprint_id`, `story_id`, `task_id`, `task_ids`.
 
----
+#### [MODIFY] [admin.functions.ts](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/frontend/src/lib/admin.functions.ts)
+- Change `z.string().uuid()` to `z.string().min(1)` for `id`, `user_id`, `position_id`, `manager_id`.
 
-### [Component 3] Dynamic Form Validation (`frontend/src/components/products/dynamic-form-renderer.tsx`)
-#### [MODIFY] [dynamic-form-renderer.tsx](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/frontend/src/components/products/dynamic-form-renderer.tsx)
-- Enhance input validation logic for required fields and add visual warning indicators.
+#### [MODIFY] [performance.functions.ts](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/frontend/src/lib/performance.functions.ts)
+- Change `z.string().uuid()` to `z.string().min(1)` for `id`, `user_id`, `metric_id`, `to_user`, `recipients`.
+
+#### [MODIFY] [teams.functions.ts](file:///c:/Users/user/Desktop/bmsmomentum/bmsmomentum-1df74f9a/frontend/src/lib/teams.functions.ts)
+- Change `z.string().uuid()` to `z.string().min(1)` for `id`, `lead_id`, `team_id`, `user_id`.
+- Fix `removeTeamMember` to accept `{ team_id: string, user_id: string }` and call `/teams/${data.team_id}/members/${data.user_id}`.
 
 ---
 
 ## 🧪 Verification Plan
 
 ### Automated Verification
-- `npm run build --prefix backend` to ensure backend TypeScript compilation.
-- `npm run build --prefix frontend` to ensure frontend Vite bundle build.
+1. `npm run build --prefix backend` to ensure backend TypeScript compilation clean.
+2. `npm run build --prefix frontend` to ensure frontend production bundle build clean.
 
 ### Manual Verification
-1. Create a Product Definition *"Doctor"* with `Require Approval on Submit` enabled.
-2. Submit a new item *"Dr. Alice Smith"*. Verify item enters `pending_approval` status.
-3. Go to `/approvals` or `/admin/approvals` and approve the request.
-4. Verify *"Dr. Alice Smith"* status automatically transitions from `pending_approval` to `onboarded` in `/products` tab.
+1. Test database reset and seed flow.
+2. Verify frontend-backend connectivity without 400s, 404s, or undefined fields.

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { listPositions, createPosition, deletePosition } from "@/lib/admin.functions";
+import { AdminGuard } from "@/components/admin-guard";
 
 export const Route = createFileRoute("/_authenticated/admin/positions")({
   head: () => ({
@@ -58,7 +59,7 @@ function PositionsPage() {
       create({
         data: {
           title,
-          level: Number(level),
+          level: Number(level) || 0,
           parent_position_id: parent === "none" ? null : parent,
         },
       }),
@@ -82,20 +83,19 @@ function PositionsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const positions = (data as Position[] | undefined) ?? [];
-
   return (
-    <div className="mx-auto max-w-4xl space-y-8 p-6 md:p-10">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-primary">Admin</p>
-          <h1 className="mt-2 flex items-center gap-2 text-3xl font-bold tracking-tight">
-            <Network className="h-7 w-7 text-primary" /> Positions
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Define positions and their hierarchy. Lower level number = higher rank.
-          </p>
-        </div>
+    <AdminGuard>
+      <div className="mx-auto max-w-4xl space-y-8 p-6 md:p-10">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-widest text-primary">Admin</p>
+            <h1 className="mt-2 flex items-center gap-2 text-3xl font-bold tracking-tight">
+              <Network className="h-7 w-7 text-primary" /> Positions
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Define positions and their hierarchy. Lower level number = higher rank.
+            </p>
+          </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -184,5 +184,6 @@ function PositionsPage() {
         )}
       </div>
     </div>
+  </AdminGuard>
   );
 }

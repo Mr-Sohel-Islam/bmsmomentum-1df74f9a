@@ -36,14 +36,14 @@ export const createMetric = createServerFn({ method: "POST" })
   });
 
 export const updateMetric = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => metricInput.extend({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => metricInput.extend({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     const { id, ...patch } = data;
     return apiClient.put<any>(`/metrics/${id}`, patch);
   });
 
 export const deleteMetric = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/metrics/${data.id}`);
   });
@@ -65,8 +65,8 @@ export const createUser = createServerFn({ method: "POST" })
         password: z.string().min(8).max(128),
         full_name: z.string().min(1).max(120),
         department: z.string().max(120).optional().nullable(),
-        position_id: z.string().uuid().optional().nullable(),
-        manager_id: z.string().uuid().optional().nullable(),
+        position_id: z.string().min(1).optional().nullable(),
+        manager_id: z.string().min(1).optional().nullable(),
         roles: z.array(z.enum(ROLES)).default([]),
         permissions: z.array(z.enum(PERMISSIONS)).default([]),
       })
@@ -93,7 +93,7 @@ export const setUserRoles = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        user_id: z.string().uuid(),
+        user_id: z.string().min(1),
         roles: z.array(z.enum(ROLES)),
       })
       .parse(d),
@@ -107,7 +107,7 @@ export const setUserPermissions = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        user_id: z.string().uuid(),
+        user_id: z.string().min(1),
         permissions: z.array(z.enum(PERMISSIONS)),
       })
       .parse(d),
@@ -123,11 +123,11 @@ export const updateUserProfile = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        user_id: z.string().uuid(),
+        user_id: z.string().min(1),
         full_name: z.string().min(1).max(120).optional(),
         department: z.string().max(120).nullable().optional(),
-        position_id: z.string().uuid().nullable().optional(),
-        manager_id: z.string().uuid().nullable().optional(),
+        position_id: z.string().min(1).nullable().optional(),
+        manager_id: z.string().min(1).nullable().optional(),
         is_active: z.boolean().optional(),
       })
       .parse(d),
@@ -142,7 +142,7 @@ export const resetUserPassword = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
       .object({
-        user_id: z.string().uuid(),
+        user_id: z.string().min(1),
         new_password: z.string().min(8).max(128),
       })
       .parse(d),
@@ -158,7 +158,7 @@ export const changeMyPassword = createServerFn({ method: "POST" })
   });
 
 export const deleteUser = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ user_id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ user_id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/profiles/${data.user_id}`);
   });
@@ -195,14 +195,14 @@ export const createPosition = createServerFn({ method: "POST" })
   });
 
 export const updatePosition = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => positionInput.extend({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => positionInput.extend({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     const { id, ...patch } = data;
     return apiClient.put<any>(`/positions/${id}`, patch);
   });
 
 export const deletePosition = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/positions/${data.id}`);
   });
@@ -227,20 +227,20 @@ export const createFlow = createServerFn({ method: "POST" })
   });
 
 export const updateFlow = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => flowInput.extend({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => flowInput.extend({ id: z.string().min(1) }).parse(d))
   .handler(async (): Promise<{ ok: boolean }> => {
     return { ok: true };
   });
 
 export const deleteFlow = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async (): Promise<{ ok: boolean }> => {
     return { ok: true };
   });
 
 export const toggleAdmin = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
-    z.object({ user_id: z.string().uuid(), make_admin: z.boolean() }).parse(d),
+    z.object({ user_id: z.string().min(1), make_admin: z.boolean() }).parse(d),
   )
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
     const roles = data.make_admin ? ["admin"] : ["user"];
