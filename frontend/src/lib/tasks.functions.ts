@@ -118,26 +118,26 @@ export type StoryInput = {
 };
 
 export const createTask = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => taskInput.parse(d))
+  .validator((d: unknown) => taskInput.parse(d))
   .handler(async ({ data }) => {
     return apiClient.post<Task>("/tasks", data);
   });
 
 export const updateTask = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => taskInput.partial().extend({ id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => taskInput.partial().extend({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     const { id, ...patch } = data;
     return apiClient.put<Task>(`/tasks/${id}`, patch);
   });
 
 export const deleteTask = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/tasks/${data.id}`);
   });
 
 export const bulkAssignTasks = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         task_ids: z.array(z.string().min(1)).min(1),
@@ -155,7 +155,7 @@ export const bulkAssignTasks = createServerFn({ method: "POST" })
   });
 
 export const bulkUpdateStatus = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         task_ids: z.array(z.string().min(1)).min(1),
@@ -173,7 +173,7 @@ export const bulkUpdateStatus = createServerFn({ method: "POST" })
 export const bulkUpdateTaskStatus = bulkUpdateStatus;
 
 export const bulkDeleteTasks = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z.object({ task_ids: z.array(z.string().min(1)).min(1) }).parse(d),
   )
   .handler(async ({ data }) => {
@@ -187,7 +187,7 @@ export const listEpics = createServerFn({ method: "GET" }).handler(async (): Pro
 });
 
 export const createEpic = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         title: z.string().min(1).max(120),
@@ -206,7 +206,7 @@ export const listSprints = createServerFn({ method: "GET" }).handler(async (): P
 });
 
 export const createSprint = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         name: z.string().min(1).max(120),
@@ -226,7 +226,7 @@ export const listStories = createServerFn({ method: "GET" }).handler(async (): P
 });
 
 export const createStory = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         title: z.string().min(1).max(160),
@@ -243,13 +243,13 @@ export const createStory = createServerFn({ method: "POST" })
   });
 
 export const listTaskComments = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => z.object({ task_id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => z.object({ task_id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.get<any[]>(`/tasks/${data.task_id}/comments`);
   });
 
 export const addTaskComment = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         task_id: z.string().min(1),

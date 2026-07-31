@@ -25,7 +25,7 @@ export const listTeams = createServerFn({ method: "GET" }).handler(async (): Pro
 });
 
 export const createTeam = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         name: z.string().min(2).max(100),
@@ -39,13 +39,13 @@ export const createTeam = createServerFn({ method: "POST" })
   });
 
 export const deleteTeam = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/teams/${data.id}`);
   });
 
 export const addTeamMember = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         team_id: z.string().min(1),
@@ -62,7 +62,7 @@ export const addTeamMember = createServerFn({ method: "POST" })
   });
 
 export const removeTeamMember = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         team_id: z.string().min(1),
@@ -75,7 +75,7 @@ export const removeTeamMember = createServerFn({ method: "POST" })
   });
 
 export const delegatePower = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         user_id: z.string().min(1),

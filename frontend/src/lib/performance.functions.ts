@@ -22,7 +22,7 @@ const scoreInput = z.object({
 });
 
 export const recordScore = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => scoreInput.parse(d))
+  .validator((d: unknown) => scoreInput.parse(d))
   .handler(async ({ data }) => {
     return apiClient.post<any>("/metrics/scores", {
       ...data,
@@ -31,7 +31,7 @@ export const recordScore = createServerFn({ method: "POST" })
   });
 
 export const deleteScore = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/metrics/scores/${data.id}`);
   });
@@ -44,7 +44,7 @@ export const listAppreciations = createServerFn({ method: "GET" }).handler(async
 });
 
 export const sendAppreciation = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         to_user: z.string().min(1),
@@ -180,7 +180,7 @@ export const listShareTargets = createServerFn({ method: "GET" }).handler(async 
 });
 
 export const sharePerformance = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         recipients: z.array(z.string().min(1)).min(1).max(25),

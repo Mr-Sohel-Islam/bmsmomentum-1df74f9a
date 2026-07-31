@@ -30,20 +30,20 @@ const metricInput = z.object({
 });
 
 export const createMetric = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => metricInput.parse(d))
+  .validator((d: unknown) => metricInput.parse(d))
   .handler(async ({ data }) => {
     return apiClient.post<any>("/metrics", data);
   });
 
 export const updateMetric = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => metricInput.extend({ id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => metricInput.extend({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     const { id, ...patch } = data;
     return apiClient.put<any>(`/metrics/${id}`, patch);
   });
 
 export const deleteMetric = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/metrics/${data.id}`);
   });
@@ -58,7 +58,7 @@ export const getMyProfile = createServerFn({ method: "GET" }).handler(async () =
 });
 
 export const createUser = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         email: z.string().email(),
@@ -90,7 +90,7 @@ export const createUser = createServerFn({ method: "POST" })
   });
 
 export const setUserRoles = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         user_id: z.string().min(1),
@@ -104,7 +104,7 @@ export const setUserRoles = createServerFn({ method: "POST" })
   });
 
 export const setUserPermissions = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         user_id: z.string().min(1),
@@ -120,7 +120,7 @@ export const setUserPermissions = createServerFn({ method: "POST" })
   });
 
 export const updateUserProfile = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         user_id: z.string().min(1),
@@ -139,7 +139,7 @@ export const updateUserProfile = createServerFn({ method: "POST" })
   });
 
 export const resetUserPassword = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         user_id: z.string().min(1),
@@ -152,19 +152,19 @@ export const resetUserPassword = createServerFn({ method: "POST" })
   });
 
 export const changeMyPassword = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ new_password: z.string().min(8).max(128) }).parse(d))
+  .validator((d: unknown) => z.object({ new_password: z.string().min(8).max(128) }).parse(d))
   .handler(async (): Promise<{ ok: boolean }> => {
     return { ok: true };
   });
 
 export const deleteUser = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ user_id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => z.object({ user_id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/profiles/${data.user_id}`);
   });
 
 export const bootstrapSuperAdmin = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         email: z.string().email(),
@@ -189,20 +189,20 @@ export const listPositions = createServerFn({ method: "GET" }).handler(async () 
 });
 
 export const createPosition = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => positionInput.parse(d))
+  .validator((d: unknown) => positionInput.parse(d))
   .handler(async ({ data }) => {
     return apiClient.post<any>("/positions", data);
   });
 
 export const updatePosition = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => positionInput.extend({ id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => positionInput.extend({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     const { id, ...patch } = data;
     return apiClient.put<any>(`/positions/${id}`, patch);
   });
 
 export const deletePosition = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/positions/${data.id}`);
   });
@@ -221,25 +221,25 @@ const flowInput = z.object({
 });
 
 export const createFlow = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => flowInput.parse(d))
+  .validator((d: unknown) => flowInput.parse(d))
   .handler(async (): Promise<{ ok: boolean }> => {
     return { ok: true };
   });
 
 export const updateFlow = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => flowInput.extend({ id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => flowInput.extend({ id: z.string().min(1) }).parse(d))
   .handler(async (): Promise<{ ok: boolean }> => {
     return { ok: true };
   });
 
 export const deleteFlow = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async (): Promise<{ ok: boolean }> => {
     return { ok: true };
   });
 
 export const toggleAdmin = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z.object({ user_id: z.string().min(1), make_admin: z.boolean() }).parse(d),
   )
   .handler(async ({ data }): Promise<{ ok: boolean }> => {

@@ -22,7 +22,7 @@ export const listWorkflows = createServerFn({ method: "GET" }).handler(async () 
 });
 
 export const createWorkflow = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         name: z.string().min(1).max(120),
@@ -36,7 +36,7 @@ export const createWorkflow = createServerFn({ method: "POST" })
   });
 
 export const updateWorkflow = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         id: z.string().min(1),
@@ -51,13 +51,13 @@ export const updateWorkflow = createServerFn({ method: "POST" })
   });
 
 export const deleteWorkflow = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/approval/workflows/${data.id}`);
   });
 
 export const addStep = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         workflow_id: z.string().min(1),
@@ -75,7 +75,7 @@ export const addStep = createServerFn({ method: "POST" })
   });
 
 export const deleteStep = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => z.object({ id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     return apiClient.delete<{ id: string }>(`/approval/steps/${data.id}`);
   });
@@ -92,7 +92,7 @@ export const listRequests = createServerFn({ method: "GET" }).handler(async () =
 });
 
 export const decideRequest = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         request_id: z.string().min(1),
