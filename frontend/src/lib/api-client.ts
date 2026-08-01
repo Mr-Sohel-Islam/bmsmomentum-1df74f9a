@@ -3,16 +3,24 @@ const API_BASE_URL =
   (typeof window === "undefined" ? "http://127.0.0.1:3000/api" : "http://localhost:3000/api");
 
 export function getAuthToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("auth_token");
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const localToken = localStorage.getItem("auth_token");
+  if (localToken) return localToken;
+
+  const match = document.cookie.match(/(?:^|; )auth_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
 export function setAuthToken(token: string | null): void {
   if (typeof window === "undefined") return;
   if (token) {
     localStorage.setItem("auth_token", token);
+    document.cookie = `auth_token=${encodeURIComponent(token)}; path=/; max-age=2592000; SameSite=Lax`;
   } else {
     localStorage.removeItem("auth_token");
+    document.cookie = "auth_token=; path=/; max-age=0; SameSite=Lax";
   }
 }
 
@@ -32,11 +40,6 @@ export async function fetchApi<T = unknown>(
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
-  } else {
-    // Fallback development auth headers for SSR / server functions and initial demo access
-    headers["x-user-id"] = "soheljavadeveloper";
-    headers["x-user-role"] = "super_admin";
-    headers["x-user-email"] = "soheljavadeveloper@company.com";
   }
 
   const response = await fetch(url, {

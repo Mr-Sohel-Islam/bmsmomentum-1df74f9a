@@ -416,16 +416,18 @@ async function seedCompleteApplicationFlows(connection: mysql.PoolConnection) {
     },
   ];
 
+  const defaultPasswordHash = hashPassword("password123");
+
   for (const m of seedMembers) {
     await connection.query(
       `INSERT INTO profiles (
-        id, full_name, avatar_url, department, position_id, manager_id, is_active,
+        id, email, password_hash, must_change_password, full_name, avatar_url, department, position_id, manager_id, is_active,
         designation, area, office_number, personal_number, emergency_family_number,
         referrals_contact, official_email, personal_email, residential_address,
         id_documents_url, bank_details_url, official_id_no
-      ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        m.id, m.full_name, m.avatar_url, m.department, m.position_id, m.manager_id,
+        m.id, m.official_email, defaultPasswordHash, m.full_name, m.avatar_url, m.department, m.position_id, m.manager_id,
         m.designation, m.area, m.office_number, m.personal_number, m.emergency_family_number,
         m.referrals_contact, m.official_email, m.personal_email, m.residential_address,
         m.id_documents_url, m.bank_details_url, m.official_id_no,
