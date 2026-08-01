@@ -701,9 +701,13 @@ export async function initDb() {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS profiles (
         id VARCHAR(36) PRIMARY KEY,
+        email VARCHAR(255),
+        password_hash VARCHAR(255),
+        must_change_password TINYINT(1) DEFAULT 0,
         full_name VARCHAR(255),
         avatar_url TEXT,
         department VARCHAR(255),
+
         position_id VARCHAR(36),
         manager_id VARCHAR(36),
         designation VARCHAR(255),
