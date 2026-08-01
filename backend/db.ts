@@ -1,7 +1,61 @@
 import mysql from "mysql2/promise";
 import dotenv from "dotenv";
+import {
+  hashPassword,
+  SUPER_ADMIN_EMAIL,
+  SUPER_ADMIN_DEFAULT_PASSWORD,
+} from "./utils/password";
 
 dotenv.config();
+
+/**
+ * Guarantees the reserved super admin (Sohel@Momentum.com) exists, is active,
+ * holds super_admin + admin, and can sign in with the seeded password.
+ */
+export async function ensureSuperAdmin(connection: mysql.PoolConnection) {
+  const id = "sohel.superadmin";
+  const password = process.env.SUPER_ADMIN_PASSWORD || SUPER_ADMIN_DEFAULT_PASSWORD;
+
+  await connection.query(
+    "INSERT INTO reserved_super_admins (id, email) VALUES (?, ?) ON DUPLICATE KEY UPDATE email = VALUES(email)",
+    ["rsa-super-admin", SUPER_ADMIN_EMAIL],
+  );
+
+  await connection.query(
+    `INSERT INTO profiles (id, email, password_hash, must_change_password, full_name, avatar_url, department, designation, official_email, is_active)
+     VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, 1)
+     ON DUPLICATE KEY UPDATE
+       email = VALUES(email),
+       password_hash = VALUES(password_hash),
+       must_change_password = 0,
+       official_email = VALUES(official_email),
+       is_active = 1`,
+    [
+      id,
+      SUPER_ADMIN_EMAIL,
+      hashPassword(password),
+      "Sohel (Super Admin)",
+      "https://api.dicebear.com/7.x/bottts/svg?seed=superadmin",
+      "Executive Board",
+      "Super Administrator",
+      SUPER_ADMIN_EMAIL,
+    ],
+  );
+
+  for (const role of ["super_admin", "admin"]) {
+    await connection.query(
+      "INSERT INTO user_roles (id, user_id, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)",
+      [`${id}-${role}`, id, role],
+    );
+  }
+  await connection.query(
+    "INSERT INTO user_permissions (id, user_id, permission) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE permission = VALUES(permission)",
+    [`${id}-all`, id, "all"],
+  );
+
+  console.log(`[MySQL Backend] Reserved super admin ensured: ${SUPER_ADMIN_EMAIL}`);
+}
+
 
 const connectionUrl = process.env.MYSQL_URL || process.env.DATABASE_URL;
 
@@ -701,9 +755,13 @@ export async function initDb() {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS profiles (
         id VARCHAR(36) PRIMARY KEY,
+        email VARCHAR(255),
+        password_hash VARCHAR(255),
+        must_change_password TINYINT(1) DEFAULT 0,
         full_name VARCHAR(255),
         avatar_url TEXT,
         department VARCHAR(255),
+
         position_id VARCHAR(36),
         manager_id VARCHAR(36),
         designation VARCHAR(255),
@@ -1025,6 +1083,9 @@ export async function initDb() {
     await addColumnIfNotExist(connection, "profiles", "id_documents_url", "TEXT");
     await addColumnIfNotExist(connection, "profiles", "bank_details_url", "TEXT");
     await addColumnIfNotExist(connection, "profiles", "official_id_no", "VARCHAR(100)");
+    await addColumnIfNotExist(connection, "profiles", "email", "VARCHAR(255)");
+    await addColumnIfNotExist(connection, "profiles", "password_hash", "VARCHAR(255)");
+    await addColumnIfNotExist(connection, "profiles", "must_change_password", "TINYINT(1) DEFAULT 0");
 
     // Check if profiles exist. If database is fresh, run full seed.
     const [existingProfiles] = await connection.query<mysql.RowDataPacket[]>(
@@ -1037,6 +1098,10 @@ export async function initDb() {
     } else {
       console.log(`[MySQL Backend] Database initialized (${profileCount} active profiles found).`);
     }
+
+    // The reserved super admin must always exist and be able to sign in.
+    await ensureSuperAdmin(connection);
+
 
     connection.release();
     isInitialized = true;

@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "nodemon --exec tsx index.ts",
     "start": "tsx index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "seed:superadmin": "tsx scripts/seed-superadmin.ts"
   },
   "dependencies": {
     "@types/cors": "^2.8.19",
