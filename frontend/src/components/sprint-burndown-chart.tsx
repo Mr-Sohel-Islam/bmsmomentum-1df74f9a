@@ -66,31 +66,26 @@ export function SprintBurndownChart({ sprints, tasks, className = "" }: SprintBu
     return doneTasks.reduce((sum, t) => sum + (t.points || 1), 0);
   }, [sprintTasks, metricMode]);
 
-  // Generate 14-day burndown schedule data
+  // Generate 14-day burndown schedule data dynamically based on actual tasks
   const chartData = useMemo(() => {
     const totalDays = 14;
     const days = [];
     const initialScope = totalPlannedPoints;
-    let scopeCreepAcc = 0;
 
     for (let day = 0; day <= totalDays; day++) {
       const idealRemaining = Math.max(0, initialScope - (initialScope / totalDays) * day);
-
-      if (day === 4 || day === 7) scopeCreepAcc += 3;
-
+      const dayProgress = day / totalDays;
       const completedByDay = Math.min(
         completedPoints,
-        Math.round((completedPoints / totalDays) * day * (0.8 + Math.sin(day) * 0.2)),
+        Math.round(completedPoints * Math.min(1, dayProgress * 1.1))
       );
-
-      const totalScopeDay = initialScope + scopeCreepAcc;
-      const actualRemaining = Math.max(0, totalScopeDay - completedByDay);
+      const actualRemaining = Math.max(0, initialScope - completedByDay);
 
       days.push({
         day: `Day ${day}`,
         ideal: Math.round(idealRemaining * 10) / 10,
         actual: Math.round(actualRemaining * 10) / 10,
-        totalScope: totalScopeDay,
+        totalScope: initialScope,
         completed: completedByDay,
       });
     }
@@ -98,20 +93,38 @@ export function SprintBurndownChart({ sprints, tasks, className = "" }: SprintBu
     return days;
   }, [totalPlannedPoints, completedPoints]);
 
-  // Historical Sprint Velocity Comparison Data
+  // Historical Sprint Velocity Comparison Data calculated dynamically from sprints & tasks
   const velocityData = useMemo(() => {
-    return [
-      { sprint: "Sprint 23.3", committed: 32, completed: 30, velocityRate: "93%" },
-      { sprint: "Sprint 23.4", committed: 40, completed: 35, velocityRate: "88%" },
-      {
-        sprint: "Sprint 24.1",
-        committed: totalPlannedPoints,
-        completed: completedPoints,
-        velocityRate: `${Math.round((completedPoints / totalPlannedPoints) * 100)}%`,
-      },
-      { sprint: "Sprint 24.2 (Est)", committed: 42, completed: 0, velocityRate: "0%" },
-    ];
-  }, [totalPlannedPoints, completedPoints]);
+    if (!sprints || sprints.length === 0) {
+      return [
+        {
+          sprint: "Current Sprint",
+          committed: totalPlannedPoints,
+          completed: completedPoints,
+          velocityRate: `${totalPlannedPoints > 0 ? Math.round((completedPoints / totalPlannedPoints) * 100) : 0}%`,
+        },
+      ];
+    }
+
+    return sprints.map((s) => {
+      const sTasks = tasks.filter((t) => t.sprint_id === s.id);
+      const committed =
+        metricMode === "tasks"
+          ? sTasks.length
+          : sTasks.reduce((sum, t) => sum + (t.points || 1), 0);
+      const completed =
+        metricMode === "tasks"
+          ? sTasks.filter((t) => t.status === "done").length
+          : sTasks.filter((t) => t.status === "done").reduce((sum, t) => sum + (t.points || 1), 0);
+      const pct = committed > 0 ? Math.round((completed / committed) * 100) : 0;
+      return {
+        sprint: s.name,
+        committed,
+        completed,
+        velocityRate: `${pct}%`,
+      };
+    });
+  }, [sprints, tasks, totalPlannedPoints, completedPoints, metricMode]);
 
   const scopeCreepPoints = useMemo(() => {
     return Math.max(0, (chartData[chartData.length - 1]?.totalScope || 0) - totalPlannedPoints);

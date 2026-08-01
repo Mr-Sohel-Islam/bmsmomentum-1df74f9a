@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Activity, Zap, CheckSquare, TrendingUp } from "lucide-react";
+import { Activity, Zap, CheckSquare, TrendingUp, Stethoscope, Store, FileText, Package } from "lucide-react";
 import { listTasks, listSprints, listStories } from "@/lib/tasks.functions";
+import { listDoctors, listTradeEntities, listDailyReports, listPharmaProducts } from "@/lib/pharma.functions";
 import { SprintBurndownChart } from "@/components/sprint-burndown-chart";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -13,6 +14,10 @@ function Dashboard() {
   const getTasks = useServerFn(listTasks);
   const getSprints = useServerFn(listSprints);
   const getStories = useServerFn(listStories);
+  const getDoctors = useServerFn(listDoctors);
+  const getTradeEntities = useServerFn(listTradeEntities);
+  const getDailyReports = useServerFn(listDailyReports);
+  const getPharmaProducts = useServerFn(listPharmaProducts);
 
   const { data: tasks = [] } = useQuery({
     queryKey: ["tasks"],
@@ -27,6 +32,26 @@ function Dashboard() {
   const { data: stories = [] } = useQuery({
     queryKey: ["stories"],
     queryFn: () => getStories(),
+  });
+
+  const { data: doctors = [] } = useQuery({
+    queryKey: ["pharma-doctors"],
+    queryFn: () => getDoctors(),
+  });
+
+  const { data: tradeEntities = [] } = useQuery({
+    queryKey: ["pharma-trade"],
+    queryFn: () => getTradeEntities(),
+  });
+
+  const { data: dailyReports = [] } = useQuery({
+    queryKey: ["pharma-reports"],
+    queryFn: () => getDailyReports(),
+  });
+
+  const { data: pharmaProducts = [] } = useQuery({
+    queryKey: ["pharma-products"],
+    queryFn: () => getPharmaProducts(),
   });
 
   const activeTasksCount = tasks.filter((t) => t.status !== "done").length;
@@ -53,13 +78,16 @@ function Dashboard() {
     .reduce((sum, t) => sum + (t.points || 0), 0);
   const velocity = Math.round((recentDonePoints / 4) * 10) / 10;
 
+  const totalDoctorVisits = dailyReports.reduce((acc, r) => acc + (r.doctor_visits_count || 0), 0);
+  const totalChemistVisits = dailyReports.reduce((acc, r) => acc + (r.chemist_visits_count || 0), 0);
+
   return (
     <div className="mx-auto max-w-7xl space-y-8 p-6 md:p-10">
       <div>
         <p className="font-mono text-xs uppercase tracking-widest text-primary">Overview</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight">Executive Dashboard</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Track sprint burn-down, team velocity, scope creep, and global project milestones.
+          Track live pharmaceutical field operations, doctor visits, trade network metrics, and sprint analytics.
         </p>
       </div>
 
@@ -94,6 +122,33 @@ function Dashboard() {
         />
       </div>
 
+      {/* Live Pharma Operations Overview Row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Stat
+          icon={Stethoscope}
+          label="Doctors Network"
+          value={String(doctors.length)}
+          hint="Registered & Assigned Doctors"
+        />
+        <Stat
+          icon={Store}
+          label="Trade Stockists"
+          value={String(tradeEntities.length)}
+          hint="Chemists, Wholesalers & Distributors"
+        />
+        <Stat
+          icon={FileText}
+          label="Field Activity Reports"
+          value={String(dailyReports.length)}
+          hint={`${totalDoctorVisits} Doctor & ${totalChemistVisits} Chemist Visits`}
+        />
+        <Stat
+          icon={Package}
+          label="3D Detailing Brands"
+          value={String(pharmaProducts.length)}
+          hint="Active Catalog Presentations"
+        />
+      </div>
 
       {/* Main Recharts Sprint Burn-down & Velocity Analytics Component */}
       <div className="pt-2">
