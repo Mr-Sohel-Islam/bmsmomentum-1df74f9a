@@ -34,6 +34,12 @@ export interface UserPermission {
   created_at?: string;
 }
 
+function sanitize(row: RowDataPacket | Record<string, unknown>): Record<string, unknown> {
+  const { password_hash, ...rest } = row as Record<string, unknown>;
+  void password_hash;
+  return rest;
+}
+
 export class UserModel {
   static async findAllProfiles(): Promise<Profile[]> {
     const [profiles] = await pool.query<RowDataPacket[]>(
@@ -59,8 +65,9 @@ export class UserModel {
     }
 
     return profiles.map((p) => ({
-      ...p,
+      ...sanitize(p),
       is_active: Boolean(p.is_active !== 0),
+      must_change_password: Boolean(p.must_change_password),
       roles: roleMap.get(p.id) || [],
       permissions: permMap.get(p.id) || [],
     })) as Profile[];
@@ -72,25 +79,83 @@ export class UserModel {
     const roles = await this.getUserRoles(id);
     const permissions = await this.getUserPermissions(id);
     return {
-      ...rows[0],
+      ...sanitize(rows[0]),
       is_active: Boolean(rows[0].is_active !== 0),
+      must_change_password: Boolean(rows[0].must_change_password),
       roles,
       permissions,
     } as Profile;
+  }
+
+  /** Look a user up by login email (email column, official_email, or raw id). */
+  static async findProfileByEmail(email: string): Promise<Profile | null> {
+    const normalized = normalizeEmail(email);
+    const [rows] = await pool.query<RowDataPacket[]>(
+      "SELECT id FROM profiles WHERE LOWER(email) = ? OR LOWER(official_email) = ? OR LOWER(personal_email) = ? OR LOWER(id) = ? LIMIT 1",
+      [normalized, normalized, normalized, normalized],
+    );
+    if (!rows[0]) return null;
+    return this.findProfileById(rows[0].id as string);
+  }
+
+  /** Returns the stored password hash for a user, or null when none is set. */
+  static async getPasswordHash(id: string): Promise<string | null> {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      "SELECT password_hash FROM profiles WHERE id = ?",
+      [id],
+    );
+    return (rows[0]?.password_hash as string) || null;
+  }
+
+  static async setPassword(id: string, plain: string, mustChange = false): Promise<void> {
+    await pool.query(
+      "UPDATE profiles SET password_hash = ?, must_change_password = ? WHERE id = ?",
+      [hashPassword(plain), mustChange ? 1 : 0, id],
+    );
+  }
+
+  static async verifyCredentials(email: string, plain: string): Promise<Profile | null> {
+    const profile = await this.findProfileByEmail(email);
+    if (!profile || profile.is_active === false) return null;
+    const hash = await this.getPasswordHash(profile.id);
+    if (!verifyPassword(plain, hash)) return null;
+    return profile;
+  }
+
+  static async isReservedSuperAdmin(id: string): Promise<boolean> {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT 1 FROM reserved_super_admins r
+       JOIN profiles p ON LOWER(p.email) = LOWER(r.email) OR LOWER(p.official_email) = LOWER(r.email)
+       WHERE p.id = ? LIMIT 1`,
+      [id],
+    );
+    return rows.length > 0;
   }
 
   static async upsertProfile(
     id: string,
     fullName: string | null,
     avatarUrl: string | null,
+    extra: { email?: string | null; password?: string | null; department?: string | null } = {},
   ): Promise<Profile> {
+    const email = extra.email ? normalizeEmail(extra.email) : null;
     await pool.query(
-      "INSERT INTO profiles (id, full_name, avatar_url) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), avatar_url = VALUES(avatar_url)",
-      [id, fullName, avatarUrl],
+      `INSERT INTO profiles (id, full_name, avatar_url, email, department)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         full_name = VALUES(full_name),
+         avatar_url = VALUES(avatar_url),
+         email = COALESCE(VALUES(email), email),
+         department = COALESCE(VALUES(department), department)`,
+      [id, fullName, avatarUrl, email, extra.department ?? null],
     );
+    if (extra.password) {
+      await this.setPassword(id, extra.password, true);
+    }
     const profile = await this.findProfileById(id);
     return profile!;
   }
+
 
   static async updateProfile(
     id: string,
