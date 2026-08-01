@@ -188,6 +188,10 @@ export class UserModel {
       fields.push("is_active = ?");
       values.push(updates.is_active ? 1 : 0);
     }
+    if (updates.email !== undefined) {
+      fields.push("email = ?");
+      values.push(updates.email ? normalizeEmail(updates.email) : null);
+    }
 
     if (fields.length > 0) {
       values.push(id);
@@ -198,6 +202,9 @@ export class UserModel {
   }
 
   static async deleteUser(id: string): Promise<boolean> {
+    if (await this.isReservedSuperAdmin(id)) {
+      throw new Error("The reserved super admin account cannot be deleted");
+    }
     await pool.query("DELETE FROM user_roles WHERE user_id = ?", [id]);
     await pool.query("DELETE FROM user_permissions WHERE user_id = ?", [id]);
     const [res] = await pool.query<ResultSetHeader>("DELETE FROM profiles WHERE id = ?", [id]);
@@ -213,8 +220,13 @@ export class UserModel {
   }
 
   static async setUserRoles(userId: string, roles: string[]): Promise<string[]> {
+    let finalRoles = Array.from(new Set(roles.filter(Boolean)));
+    // The reserved super admin always keeps super_admin + admin.
+    if (await this.isReservedSuperAdmin(userId)) {
+      finalRoles = Array.from(new Set([...finalRoles, "super_admin", "admin"]));
+    }
     await pool.query("DELETE FROM user_roles WHERE user_id = ?", [userId]);
-    for (const role of roles) {
+    for (const role of finalRoles) {
       const id = crypto.randomUUID();
       await pool.query("INSERT INTO user_roles (id, user_id, role) VALUES (?, ?, ?)", [
         id,
@@ -223,6 +235,7 @@ export class UserModel {
       ]);
     }
     return this.getUserRoles(userId);
+
   }
 
   static async addUserRole(userId: string, role: string): Promise<UserRole> {
