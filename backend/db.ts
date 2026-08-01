@@ -783,6 +783,13 @@ export async function initDb() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
+    // High-performance index for recursive manager hierarchy CTE queries
+    try {
+      await connection.query("CREATE INDEX idx_profiles_manager_id ON profiles(manager_id)");
+    } catch {
+      // Index already exists
+    }
+
     await connection.query(`
       CREATE TABLE IF NOT EXISTS reserved_super_admins (
         id VARCHAR(36) PRIMARY KEY,

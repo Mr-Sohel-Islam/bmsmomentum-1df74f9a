@@ -113,8 +113,8 @@ frontend/src/
 | `doctors` | `id` | Doctor master data. Columns: `name`, `department`, `area_locality`, `whatsapp_contact`, `dob`, `spouse_dob`, `anniversary_date`, `child_dobs` (JSON), `special_day`, `gift_accepted_details`, `created_by`, `assigned_to`. |
 | `trade_entities` | `id` | Trade firm master data. Columns: `category` (`chemist`\|`wholesaler`\|`distributor`), `firm_name`, `drug_license_no`, `gst_number`, `address`, `proprietor_name`, `contact_number`, `email`, `comm_modes`, `billing_details`, `payment_details`, `offer_scheme_details`, `created_by`, `assigned_to`. |
 | `daily_reports` | `id` | Workstation daily activity logs. Columns: `user_id`, `report_date`, `doctor_visits_count`, `chemist_visits_count`, `wholesale_visits_count`, `distributor_visits_count`, `billing_amount`, `payment_amount`, `offers_distributed`, `special_achievements`, `notes`. |
-| `pharma_products` | `id` | 3D Visual Detailing master catalog. Columns: `name`, `composition`, `category`, `packaging`, `mrp`, `ptr`, `pts`, `image_url`, `detailing_presentation_url`, `key_benefits` (JSON), `active_promotional_scheme`. |
-| `products` | `id` | Product templates. Columns: `name`, `slug`, `product_type`, `category`, `form_schema` (JSON), `approval_settings` (JSON), `created_by`. |
+| `pharma_products` | `id` | Pharmaceutical 3D Visual Detailing catalog (`/detailing`). Columns: `name`, `composition`, `category`, `packaging`, `mrp`, `ptr`, `pts`, `image_url`, `detailing_presentation_url`, `key_benefits` (JSON), `active_promotional_scheme`. |
+| `products` | `id` | Dynamic Form Builder & Entity Onboarding templates (`/products`). Columns: `name`, `slug`, `product_type`, `category`, `form_schema` (JSON), `approval_settings` (JSON), `created_by`. |
 | `product_items` | `id` | Onboarded record instances. Columns: `product_id`, `item_name`, `status` (`pending_approval`\|`onboarded`\|`rejected`), `approval_request_id`, `custom_fields` (JSON). |
 | `approval_workflows` | `id` | Workflow definitions. Columns: `name`, `entity_type`, `active`. |
 | `approval_steps` | `id` | Multi-stage steps. Columns: `workflow_id`, `step_order`, `approver_type`, `approver_ref`. |
