@@ -321,18 +321,20 @@ sequenceDiagram
 
 ---
 
-## 8. Seeded Profiles & Credentials Reference
+## 8. 🔺 The 8-Tier Working Pyramid & Seeded Credentials Reference
 
-The application is pre-seeded with 6 complete organizational accounts representing all primary system roles:
+The application enforces an 8-level Working Pyramid hierarchy with Senior Pyramid Visibility (`getSubordinateUserIds`). Senior officials (AM, SM, BM, RM, GM, Director) can view records created by or assigned to themselves and all junior subordinates in their management chain.
 
-| User ID | Email | Full Name | System Role(s) | Position Title | Manager | Accessible UI Surfaces |
-|:---|:---|:---|:---|:---|:---|:---|
-| **`soheljavadeveloper`** | `soheljavadeveloper@company.com` | Sohel Islam | `super_admin`, `admin` | Super Admin / Executive | *None* | All surfaces (`/admin/*`, `/products`, `/approvals`, `/tasks`, `/performance`) |
-| **`alex.rivera`** | `alex.rivera@company.com` | Alex Rivera | `manager`, `scrum_master` | Engineering Manager | `soheljavadeveloper` | `/tasks`, `/approvals`, `/performance`, `/products`, `/appreciation` |
-| **`sarah.chen`** | `sarah.chen@company.com` | Sarah Chen | `product_owner` | Product Owner | `soheljavadeveloper` | `/products`, `/tasks`, `/approvals`, `/performance`, `/appreciation` |
-| **`dr.jenkins`** | `dr.jenkins@company.com` | Dr. Sarah Jenkins | `manager` | Healthcare Ops Lead | `soheljavadeveloper` | `/approvals`, `/tasks`, `/performance`, `/products`, `/appreciation` |
-| **`marcus.vance`** | `marcus.vance@company.com` | Marcus Vance | `developer` | Sr. Full-Stack Dev | `alex.rivera` | `/tasks`, `/products`, `/appreciation`, `/approvals`, `/performance` |
-| **`elena.rostova`** | `elena.rostova@company.com` | Elena Rostova | `developer` | Lead QA Engineer | `alex.rivera` | `/tasks`, `/products`, `/appreciation`, `/approvals`, `/performance` |
+| Pyramid Level | User ID | Official Email | Full Name | System Role(s) | Position Title | Manager | Accessible UI Surfaces |
+|:---|:---|:---|:---|:---|:---|:---|:---|
+| **Level 0** | **`director.main`** | `director@momentumpharma.com` | Sohel Islam (Director & Chairman) | `super_admin`, `admin`, `director` | Director & Chairman | *None* | All surfaces (`/admin/*`, `/doctors`, `/trade`, `/workstation`, `/detailing`, `/products`, `/approvals`) |
+| **Level 1** | **`gm.sharma`** | `rajesh.gm@momentumpharma.com` | Rajesh Sharma | `admin`, `gm` | General Manager | `director.main` | All operational surfaces + Admin management |
+| **Level 2** | **`rm.verma`** | `amit.rm@momentumpharma.com` | Amit Verma | `manager`, `rm` | Regional Manager | `gm.sharma` | `/doctors`, `/trade`, `/workstation`, `/detailing`, `/tasks`, `/approvals` |
+| **Level 3** | **`bm.gupta`** | `vikram.bm@momentumpharma.com` | Vikram Gupta | `manager`, `bm` | Business Manager | `rm.verma` | `/doctors`, `/trade`, `/workstation`, `/detailing`, `/tasks`, `/approvals` |
+| **Level 4** | **`sm.singh`** | `rohan.sm@momentumpharma.com` | Rohan Singh | `manager`, `sm` | Sales Manager | `bm.gupta` | `/doctors`, `/trade`, `/workstation`, `/detailing`, `/tasks`, `/approvals` |
+| **Level 5** | **`am.kumar`** | `sanjay.am@momentumpharma.com` | Sanjay Kumar | `manager`, `am` | Area Manager | `sm.singh` | `/doctors`, `/trade`, `/workstation`, `/detailing`, `/tasks`, `/approvals` |
+| **Level 6** | **`smr.patel`** | `priya.smr@momentumpharma.com` | Priya Patel | `developer`, `smr` | Sr. Medical Representative | `am.kumar` | `/doctors`, `/trade`, `/workstation`, `/detailing`, `/tasks`, `/appreciation` |
+| **Level 7** | **`mr.das`** | `rahul.mr@momentumpharma.com` | Rahul Das | `developer`, `mr` | Medical Representative | `smr.patel` | `/doctors`, `/trade`, `/workstation`, `/detailing`, `/tasks`, `/appreciation` |
 
 > [!NOTE]
-> **Authentication Password**: All seeded accounts accept `password123` (or any string) during sign-in in local development mode.
+> **Authentication Password**: All seeded accounts accept `password123` (or any string) during sign-in in development and staging modes.
