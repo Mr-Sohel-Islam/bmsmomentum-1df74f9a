@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
+import { useQueryClient } from "@tanstack/react-query";
+
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
@@ -21,6 +23,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,8 +45,10 @@ function AuthPage() {
       });
       if (res.token) {
         setAuthToken(res.token);
+        qc.removeQueries({ queryKey: ["me"] });
+        await qc.invalidateQueries({ queryKey: ["me"] });
         toast.success("Signed in successfully");
-        navigate({ to: "/dashboard" });
+        window.location.href = "/dashboard";
       } else {
         throw new Error("No auth token returned from server");
       }
@@ -125,7 +130,37 @@ function AuthPage() {
             </Button>
           </form>
 
-          <div className="mt-6 flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
+          <div className="mt-4 flex flex-col gap-2 rounded-lg border border-border/80 bg-card p-3 text-xs">
+            <div className="font-semibold text-foreground">Quick Demo Sign-In Credentials:</div>
+            <div className="flex flex-col gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="justify-start text-xs font-normal"
+                onClick={() => {
+                  setEmail("sohel@momentum.com");
+                  setPassword("Sohel@34892");
+                }}
+              >
+                🔑 <strong>Super Admin</strong>: sohel@momentum.com
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="justify-start text-xs font-normal"
+                onClick={() => {
+                  setEmail("director@momentumpharma.com");
+                  setPassword("password123");
+                }}
+              >
+                👑 <strong>Director (Pyramid Level 0)</strong>: director@momentumpharma.com
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-start gap-2 rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
             <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>Public sign-up is disabled. Admins onboard new users from the Users page.</span>
           </div>
