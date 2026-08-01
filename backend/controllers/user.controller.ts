@@ -18,11 +18,17 @@ export class UserController {
   }
 
   static async upsertProfile(req: Request, res: Response) {
-    const { id, full_name, avatar_url } = req.body;
+    const { id, full_name, avatar_url, email, password, department, position_id, manager_id } = req.body;
     if (!id) {
       throw new AppError("id is required", 400);
     }
-    const profile = await UserModel.upsertProfile(id, full_name || null, avatar_url || null);
+    const profile = await UserModel.upsertProfile(id, full_name || null, avatar_url || null, {
+      email,
+      password,
+      department,
+      position_id,
+      manager_id,
+    });
     return sendSuccess(res, profile, "Profile saved");
   }
 

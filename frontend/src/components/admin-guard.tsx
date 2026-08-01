@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 
 export function AdminGuard({ children }: { children: ReactNode }) {
-  const { isAdmin, isLoading } = useMyAccess();
+  const { isAdmin, canAny, isLoading } = useMyAccess();
 
   if (isLoading) {
     return (
@@ -16,7 +16,9 @@ export function AdminGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!isAdmin) {
+  const hasAccess = isAdmin || canAny(["users:manage", "users:read", "teams:manage", "teams:read", "all"]);
+
+  if (!hasAccess) {
     return (
       <div className="mx-auto max-w-md p-8 text-center">
         <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-destructive/10 text-destructive">

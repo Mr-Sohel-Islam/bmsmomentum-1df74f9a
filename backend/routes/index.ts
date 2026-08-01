@@ -17,6 +17,7 @@ apiRouter.use("/", teamRoutes);
 apiRouter.use("/", taskRoutes);
 apiRouter.use("/", performanceRoutes);
 apiRouter.use("/approval", approvalRoutes);
+apiRouter.use("/approvals", approvalRoutes);
 apiRouter.use("/", appreciationRoutes);
 apiRouter.use("/products", productRoutes);
 apiRouter.use("/pharma", pharmaRoutes);

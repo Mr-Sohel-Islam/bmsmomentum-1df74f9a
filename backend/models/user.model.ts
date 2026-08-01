@@ -136,18 +136,34 @@ export class UserModel {
     id: string,
     fullName: string | null,
     avatarUrl: string | null,
-    extra: { email?: string | null; password?: string | null; department?: string | null } = {},
+    extra: {
+      email?: string | null;
+      password?: string | null;
+      department?: string | null;
+      position_id?: string | null;
+      manager_id?: string | null;
+    } = {},
   ): Promise<Profile> {
     const email = extra.email ? normalizeEmail(extra.email) : null;
     await pool.query(
-      `INSERT INTO profiles (id, full_name, avatar_url, email, department)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO profiles (id, full_name, avatar_url, email, department, position_id, manager_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          full_name = VALUES(full_name),
          avatar_url = VALUES(avatar_url),
          email = COALESCE(VALUES(email), email),
-         department = COALESCE(VALUES(department), department)`,
-      [id, fullName, avatarUrl, email, extra.department ?? null],
+         department = COALESCE(VALUES(department), department),
+         position_id = COALESCE(VALUES(position_id), position_id),
+         manager_id = COALESCE(VALUES(manager_id), manager_id)`,
+      [
+        id,
+        fullName,
+        avatarUrl,
+        email,
+        extra.department ?? null,
+        extra.position_id ?? null,
+        extra.manager_id ?? null,
+      ],
     );
     if (extra.password) {
       await this.setPassword(id, extra.password, true);
@@ -212,11 +228,15 @@ export class UserModel {
   }
 
   static async getUserRoles(userId: string): Promise<string[]> {
-    const [rows] = await pool.query<RowDataPacket[]>(
-      "SELECT role FROM user_roles WHERE user_id = ?",
-      [userId],
-    );
-    return rows.map((r) => r.role);
+    try {
+      const [rows] = await pool.query<RowDataPacket[]>(
+        "SELECT role FROM user_roles WHERE user_id = ?",
+        [userId],
+      );
+      return rows.map((r) => r.role);
+    } catch {
+      return [];
+    }
   }
 
   static async setUserRoles(userId: string, roles: string[]): Promise<string[]> {
@@ -225,17 +245,20 @@ export class UserModel {
     if (await this.isReservedSuperAdmin(userId)) {
       finalRoles = Array.from(new Set([...finalRoles, "super_admin", "admin"]));
     }
-    await pool.query("DELETE FROM user_roles WHERE user_id = ?", [userId]);
-    for (const role of finalRoles) {
-      const id = crypto.randomUUID();
-      await pool.query("INSERT INTO user_roles (id, user_id, role) VALUES (?, ?, ?)", [
-        id,
-        userId,
-        role,
-      ]);
+    try {
+      await pool.query("DELETE FROM user_roles WHERE user_id = ?", [userId]);
+      for (const role of finalRoles) {
+        const id = crypto.randomUUID();
+        await pool.query("INSERT INTO user_roles (id, user_id, role) VALUES (?, ?, ?)", [
+          id,
+          userId,
+          role,
+        ]);
+      }
+    } catch {
+      // Table error fallback
     }
     return this.getUserRoles(userId);
-
   }
 
   static async addUserRole(userId: string, role: string): Promise<UserRole> {
@@ -250,11 +273,15 @@ export class UserModel {
   }
 
   static async getUserPermissions(userId: string): Promise<string[]> {
-    const [rows] = await pool.query<RowDataPacket[]>(
-      "SELECT permission FROM user_permissions WHERE user_id = ?",
-      [userId],
-    );
-    return rows.map((r) => r.permission);
+    try {
+      const [rows] = await pool.query<RowDataPacket[]>(
+        "SELECT permission FROM user_permissions WHERE user_id = ?",
+        [userId],
+      );
+      return rows.map((r) => r.permission);
+    } catch {
+      return [];
+    }
   }
 
   static async setUserPermissions(userId: string, permissions: string[]): Promise<string[]> {

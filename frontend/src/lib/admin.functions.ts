@@ -3,17 +3,57 @@ import { z } from "zod";
 import { apiClient } from "./api-client";
 
 export const PERMISSIONS = [
-  "onboard_users",
-  "score_performance",
-  "send_appreciation",
-  "approve_requests",
-  "view_team",
-  "manage_metrics",
-  "manage_tasks",
+  "tasks:read",
+  "tasks:create",
+  "tasks:update",
+  "tasks:delete",
+  "tasks:bulk",
+  "tasks:update_status",
+  "tasks:manage",
+  "sprints:read",
+  "sprints:manage",
+  "epics:read",
+  "epics:manage",
+  "approvals:read",
+  "approvals:create",
+  "approvals:action",
+  "approvals:manage",
+  "products:read",
+  "products:manage",
+  "products:onboard_item",
+  "pharma:read",
+  "pharma:create",
+  "trade:read",
+  "trade:create",
+  "reports:read",
+  "reports:create",
+  "detailing:read",
+  "teams:read",
+  "teams:manage",
+  "teams:members",
+  "users:read",
+  "users:manage",
+  "metrics:manage",
+  "performance:read",
+  "performance:evaluate",
+  "all",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-export const ROLES = ["super_admin", "admin", "manager", "member"] as const;
+export const ROLES = [
+  "super_admin",
+  "admin",
+  "director",
+  "gm",
+  "manager",
+  "rm",
+  "bm",
+  "sm",
+  "am",
+  "field_rep",
+  "smr",
+  "mr",
+] as const;
 export type Role = (typeof ROLES)[number];
 
 // ---------- Metrics ----------
@@ -75,7 +115,12 @@ export const createUser = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const profile = await apiClient.post<any>("/profiles", {
       id: data.email.split("@")[0],
+      email: data.email,
+      password: data.password,
       full_name: data.full_name,
+      department: data.department || null,
+      position_id: data.position_id || null,
+      manager_id: data.manager_id || null,
       avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${data.email}`,
     });
     if (data.roles.length) {
@@ -147,7 +192,10 @@ export const resetUserPassword = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async (): Promise<{ ok: boolean }> => {
+  .handler(async ({ data }): Promise<{ ok: boolean }> => {
+    await apiClient.post(`/auth/users/${data.user_id}/reset-password`, {
+      new_password: data.new_password,
+    });
     return { ok: true };
   });
 
@@ -243,7 +291,7 @@ export const toggleAdmin = createServerFn({ method: "POST" })
     z.object({ user_id: z.string().min(1), make_admin: z.boolean() }).parse(d),
   )
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
-    const roles = data.make_admin ? ["admin"] : ["user"];
+    const roles = data.make_admin ? ["admin"] : ["mr"];
     await apiClient.put(`/profiles/${data.user_id}/roles`, { roles });
     return { ok: true };
   });

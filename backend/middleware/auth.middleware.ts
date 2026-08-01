@@ -21,141 +21,84 @@ declare global {
 
 export type AuthRequest = Request;
 
+const ALL_PERMISSIONS = ["all"];
+const TASK_READ = ["tasks:read"];
+const TASK_WRITE = ["tasks:read", "tasks:create", "tasks:update"];
+const TASK_MANAGE = [...TASK_WRITE, "tasks:manage"];
+const TEAM_READ = ["teams:read"];
+const APPROVAL_READ = ["approvals:read"];
+const APPROVAL_CREATE = ["approvals:create"];
+const APPROVAL_ACTION = ["approvals:read", "approvals:action"];
+const FIELD_OPERATIONS = [
+  "pharma:read",
+  "pharma:create",
+  "trade:read",
+  "trade:create",
+  "reports:read",
+  "reports:create",
+  "detailing:read",
+];
+const PERFORMANCE_READ = ["performance:read"];
+
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
-  super_admin: ["all"],
-  admin: ["all"],
-  director: ["all"],
-  gm: ["all"],
-  rm: [
-    "tasks:read",
-    "tasks:create",
-    "tasks:update",
-    "teams:read",
-    "approvals:read",
-    "approvals:create",
-    "approvals:action",
-    "performance:read",
-    "users:read",
-  ],
-  bm: [
-    "tasks:read",
-    "tasks:create",
-    "tasks:update",
-    "teams:read",
-    "approvals:read",
-    "approvals:create",
-    "approvals:action",
-    "performance:read",
-  ],
-  sm: [
-    "tasks:read",
-    "tasks:create",
-    "tasks:update",
-    "teams:read",
-    "approvals:read",
-    "approvals:create",
-    "approvals:action",
-    "performance:read",
-  ],
-  am: [
-    "tasks:read",
-    "tasks:create",
-    "tasks:update",
-    "teams:read",
-    "approvals:read",
-    "approvals:create",
-    "approvals:action",
-    "performance:read",
-  ],
-  smr: [
-    "tasks:read",
-    "tasks:create",
-    "tasks:update",
-    "teams:read",
-    "approvals:read",
-    "approvals:create",
-    "performance:read",
-  ],
-  mr: [
-    "tasks:read",
-    "tasks:create",
-    "tasks:update",
-    "teams:read",
-    "approvals:read",
-    "approvals:create",
-    "performance:read",
-  ],
-  field_rep: [
-    "tasks:read",
-    "tasks:create",
-    "tasks:update",
-    "teams:read",
-    "approvals:read",
-    "approvals:create",
-    "performance:read",
-  ],
+  super_admin: ALL_PERMISSIONS,
+  admin: ALL_PERMISSIONS,
+  director: ALL_PERMISSIONS,
+  gm: ALL_PERMISSIONS,
+  rm: [...TASK_MANAGE, ...TEAM_READ, ...APPROVAL_ACTION, ...FIELD_OPERATIONS, "users:read"],
+  bm: [...TASK_MANAGE, ...TEAM_READ, ...APPROVAL_ACTION, ...FIELD_OPERATIONS],
+  sm: [...TASK_MANAGE, ...TEAM_READ, ...APPROVAL_ACTION, ...FIELD_OPERATIONS],
+  am: [...TASK_MANAGE, ...TEAM_READ, ...APPROVAL_ACTION, ...FIELD_OPERATIONS],
+  smr: [...TASK_READ, ...APPROVAL_CREATE, ...FIELD_OPERATIONS, ...PERFORMANCE_READ],
+  mr: [...TASK_READ, ...FIELD_OPERATIONS, ...PERFORMANCE_READ],
+  field_rep: [...TASK_READ, ...FIELD_OPERATIONS, ...PERFORMANCE_READ],
   sales_rep: [
-    "tasks:read",
-    "tasks:create",
-    "tasks:update",
-    "teams:read",
-    "approvals:read",
-    "approvals:create",
-    "performance:read",
+    ...TASK_WRITE,
+    ...TEAM_READ,
+    ...APPROVAL_READ,
+    ...APPROVAL_CREATE,
+    ...PERFORMANCE_READ,
   ],
   product_owner: [
-    "tasks:read",
-    "tasks:create",
-    "tasks:update",
+    ...TASK_WRITE,
     "tasks:delete",
     "tasks:bulk",
-    "teams:read",
-    "approvals:read",
-    "approvals:create",
+    ...TEAM_READ,
+    ...APPROVAL_READ,
+    ...APPROVAL_CREATE,
     "approvals:action",
   ],
   scrum_master: [
-    "tasks:read",
-    "tasks:create",
-    "tasks:update",
+    ...TASK_WRITE,
     "tasks:bulk",
-    "teams:read",
+    ...TEAM_READ,
     "teams:members",
-    "approvals:read",
-    "approvals:create",
+    ...APPROVAL_READ,
+    ...APPROVAL_CREATE,
   ],
   manager: [
-    "tasks:read",
-    "tasks:create",
-    "tasks:update",
-    "teams:read",
+    ...TASK_MANAGE,
+    ...TEAM_READ,
     "teams:manage",
     "teams:members",
-    "approvals:read",
-    "approvals:create",
+    ...APPROVAL_READ,
+    ...APPROVAL_CREATE,
     "approvals:action",
     "approvals:manage",
-    "performance:read",
+    ...FIELD_OPERATIONS,
+    ...PERFORMANCE_READ,
     "performance:evaluate",
     "users:read",
   ],
   developer: [
-    "tasks:read",
-    "tasks:create",
-    "tasks:update",
-    "teams:read",
-    "approvals:read",
-    "approvals:create",
-    "performance:read",
+    ...TASK_WRITE,
+    ...TEAM_READ,
+    ...APPROVAL_READ,
+    ...APPROVAL_CREATE,
+    ...PERFORMANCE_READ,
   ],
-  viewer: [
-    "tasks:read",
-    "teams:read",
-    "approvals:read",
-    "performance:read",
-    "users:read",
-  ],
-  guest: ["tasks:read"],
+  viewer: [...TASK_READ, ...TEAM_READ, ...APPROVAL_READ, ...PERFORMANCE_READ, "users:read"],
+  guest: TASK_READ,
 };
 
 export function resolveUserPermissions(roles: string[], explicitPermissions: string[]): string[] {
@@ -198,31 +141,66 @@ export function verifyToken(token: string): AuthenticatedUser {
   }
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+function getBearerToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    throw new AppError("Authentication token required", 401);
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  return authHeader.substring(7).trim() || null;
+}
+
+function getMockUser(req: Request): AuthenticatedUser | null {
+  if (process.env.NODE_ENV === "production") return null;
+
+  const mockUserId = req.headers["x-user-id"] as string | undefined;
+  if (!mockUserId) return null;
+
+  const roles = String(req.headers["x-user-role"] || "admin")
+    .split(",")
+    .map((role) => role.trim())
+    .filter(Boolean);
+
+  return {
+    id: mockUserId,
+    email: `${mockUserId}@company.com`,
+    roles,
+    permissions: resolveUserPermissions(roles, []),
+  };
+}
+
+const isRootRole = (roles: string[] = []) =>
+  roles.includes("admin") || roles.includes("super_admin");
+
+const hasPermission = (user: AuthenticatedUser, requiredPermissions: string[]) => {
+  const permissions = user.permissions || [];
+  return (
+    isRootRole(user.roles) ||
+    permissions.includes("all") ||
+    requiredPermissions.some((permission) => permissions.includes(permission))
+  );
+};
+
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const token = getBearerToken(req);
+  if (token) {
+    req.user = verifyToken(token);
+    return next();
   }
 
-  const token = authHeader.substring(7).trim();
-  if (!token) {
-    throw new AppError("Malformed authorization token", 401);
+  const mockUser = getMockUser(req);
+  if (mockUser) {
+    req.user = mockUser;
+    return next();
   }
 
-  req.user = verifyToken(token);
-  next();
+  throw new AppError("Authentication token required", 401);
 }
 
 export function optionalAuth(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    const token = authHeader.substring(7).trim();
-    if (token) {
-      try {
-        req.user = verifyToken(token);
-      } catch {
-        // Ignore invalid token in optionalAuth
-      }
+  const token = getBearerToken(req);
+  if (token) {
+    try {
+      req.user = verifyToken(token);
+    } catch {
+      // Ignore invalid token in optionalAuth
     }
   }
   next();
@@ -235,8 +213,7 @@ export function requireRole(...allowedRoles: string[]) {
       throw new AppError("Authentication required", 401);
     }
     const hasRole = req.user.roles?.some((role) => allowedRoles.includes(role));
-    const isRoot = req.user.roles?.includes("admin") || req.user.roles?.includes("super_admin");
-    if (!hasRole && !isRoot) {
+    if (!hasRole && !isRootRole(req.user.roles)) {
       throw new AppError("Insufficient role permissions", 403);
     }
     next();
@@ -248,14 +225,8 @@ export function requirePermission(...requiredPermissions: string[]) {
     if (!req.user) {
       throw new AppError("Authentication required", 401);
     }
-    const userPerms = req.user.permissions || [];
-    const isRoot = req.user.roles?.includes("admin") || req.user.roles?.includes("super_admin");
-    const hasPerm =
-      isRoot ||
-      userPerms.includes("all") ||
-      requiredPermissions.some((perm) => userPerms.includes(perm));
 
-    if (!hasPerm) {
+    if (!hasPermission(req.user, requiredPermissions)) {
       throw new AppError(`Missing required permission: ${requiredPermissions.join(", ")}`, 403);
     }
     next();

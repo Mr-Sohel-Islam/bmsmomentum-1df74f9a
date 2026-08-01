@@ -1,24 +1,29 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { PharmaModel } from "../models/pharma.model";
 import { sendSuccess, AppError } from "../utils/response";
 import { AuthRequest } from "../middleware/auth.middleware";
 
+const ROOT_OPERATIONAL_ROLES = ["super_admin", "admin", "director", "gm"];
+
 export class PharmaController {
+  private static isRootOperationalUser(req: AuthRequest): boolean {
+    return ROOT_OPERATIONAL_ROLES.some((role) => req.user?.roles?.includes(role));
+  }
+
+  private static userId(req: AuthRequest): string {
+    if (!req.user?.id) throw new AppError("Authentication required", 401);
+    return req.user.id;
+  }
+
   // Doctors
   static async getDoctors(req: AuthRequest, res: Response) {
-    const userId = req.user?.id || "mr.das";
-    const isRootAdmin =
-      req.user?.roles?.includes("super_admin") ||
-      req.user?.roles?.includes("admin") ||
-      req.user?.roles?.includes("director") ||
-      false;
-
-    const doctors = await PharmaModel.getDoctorsForUser(userId, isRootAdmin);
+    const userId = PharmaController.userId(req);
+    const doctors = await PharmaModel.getDoctorsForUser(userId, PharmaController.isRootOperationalUser(req));
     return sendSuccess(res, doctors, "Doctors fetched successfully");
   }
 
   static async createDoctor(req: AuthRequest, res: Response) {
-    const userId = req.user?.id || "mr.das";
+    const userId = PharmaController.userId(req);
     const {
       name,
       department,
@@ -57,11 +62,7 @@ export class PharmaController {
 
   static async updateDoctor(req: AuthRequest, res: Response) {
     const id = req.params.id as string;
-    const isRootAdmin =
-      req.user?.roles?.includes("super_admin") ||
-      req.user?.roles?.includes("admin") ||
-      req.user?.roles?.includes("director") ||
-      false;
+    const isRootAdmin = PharmaController.isRootOperationalUser(req);
 
     if (!isRootAdmin) {
       throw new AppError("Only Admins and Directors can modify or reassign doctor entries", 403);
@@ -72,14 +73,19 @@ export class PharmaController {
   }
 
   // Trade Entities (Chemists, Wholesalers, Distributors)
-  static async getTradeEntities(req: Request, res: Response) {
+  static async getTradeEntities(req: AuthRequest, res: Response) {
+    const userId = PharmaController.userId(req);
     const category = req.query.category as string | undefined;
-    const entities = await PharmaModel.getTradeEntities(category);
+    const entities = await PharmaModel.getTradeEntitiesForUser(
+      userId,
+      PharmaController.isRootOperationalUser(req),
+      category,
+    );
     return sendSuccess(res, entities, "Trade entities fetched successfully");
   }
 
   static async createTradeEntity(req: AuthRequest, res: Response) {
-    const userId = req.user?.id || "mr.das";
+    const userId = PharmaController.userId(req);
     const {
       category,
       firm_name,
@@ -121,17 +127,24 @@ export class PharmaController {
   }
 
   // Daily Reports
-  static async getDailyReports(req: Request, res: Response) {
-    const userId = req.query.user_id as string | undefined;
+  static async getDailyReports(req: AuthRequest, res: Response) {
+    const userId = PharmaController.userId(req);
+    const requestedUserId = req.query.user_id as string | undefined;
     const dateFrom = req.query.date_from as string | undefined;
     const dateTo = req.query.date_to as string | undefined;
 
-    const reports = await PharmaModel.getDailyReports(userId, dateFrom, dateTo);
+    const reports = await PharmaModel.getDailyReportsForUser(
+      userId,
+      PharmaController.isRootOperationalUser(req),
+      requestedUserId,
+      dateFrom,
+      dateTo,
+    );
     return sendSuccess(res, reports, "Daily workstation reports fetched successfully");
   }
 
   static async createDailyReport(req: AuthRequest, res: Response) {
-    const userId = req.user?.id || "mr.das";
+    const userId = PharmaController.userId(req);
     const {
       report_date,
       doctor_visits_count,
@@ -163,7 +176,7 @@ export class PharmaController {
   }
 
   // 3D Detailing Pharma Products
-  static async getPharmaProducts(_req: Request, res: Response) {
+  static async getPharmaProducts(_req: AuthRequest, res: Response) {
     const products = await PharmaModel.getPharmaProducts();
     return sendSuccess(res, products, "3D Detailing products fetched successfully");
   }

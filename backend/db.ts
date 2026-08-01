@@ -808,6 +808,15 @@ export async function initDb() {
     `);
 
     await connection.query(`
+      CREATE TABLE IF NOT EXISTS user_permissions (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL,
+        permission VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await connection.query(`
       CREATE TABLE IF NOT EXISTS user_positions (
         id VARCHAR(36) PRIMARY KEY,
         title VARCHAR(255) NOT NULL,

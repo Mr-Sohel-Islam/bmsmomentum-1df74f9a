@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { UserController } from "../controllers/user.controller.js";
+import { AuthController } from "../controllers/auth.controller.js";
 import { asyncHandler } from "../utils/response.js";
 import { requireAuth, requirePermission } from "../middleware/auth.middleware.js";
 import { resetAndSeedDatabase } from "../db.js";
@@ -7,7 +8,7 @@ import { resetAndSeedDatabase } from "../db.js";
 const router = Router();
 
 // Reset and Seed complete application flows
-router.post("/reset-seed", requireAuth, async (_req: Request, res: Response) => {
+router.post("/reset-seed", requireAuth, requirePermission("users:manage"), async (_req: Request, res: Response) => {
   try {
     await resetAndSeedDatabase();
     return res.json({
@@ -25,10 +26,12 @@ router.post("/profiles", requireAuth, requirePermission("users:manage"), asyncHa
 router.put("/profiles/:id", requireAuth, requirePermission("users:manage"), asyncHandler(UserController.updateProfile));
 router.delete("/profiles/:id", requireAuth, requirePermission("users:manage"), asyncHandler(UserController.deleteUser));
 
-router.put("/profiles/:id/roles", requireAuth, requirePermission("users:roles"), asyncHandler(UserController.setUserRoles));
-router.post("/roles", requireAuth, requirePermission("users:roles"), asyncHandler(UserController.addRole));
+router.put("/profiles/:id/roles", requireAuth, requirePermission("users:manage"), asyncHandler(UserController.setUserRoles));
+router.post("/roles", requireAuth, requirePermission("users:manage"), asyncHandler(UserController.addRole));
 
-router.put("/profiles/:id/permissions", requireAuth, requirePermission("users:roles"), asyncHandler(UserController.setUserPermissions));
-router.post("/permissions", requireAuth, requirePermission("users:roles"), asyncHandler(UserController.addPermission));
+router.put("/profiles/:id/permissions", requireAuth, requirePermission("users:manage"), asyncHandler(UserController.setUserPermissions));
+router.post("/permissions", requireAuth, requirePermission("users:manage"), asyncHandler(UserController.addPermission));
+
+router.post("/profiles/:id/reset-password", requireAuth, requirePermission("users:manage"), asyncHandler(AuthController.resetPassword));
 
 export default router;

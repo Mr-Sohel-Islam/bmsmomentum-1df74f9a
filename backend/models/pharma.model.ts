@@ -217,6 +217,34 @@ export class PharmaModel {
     return rows as TradeEntityRecord[];
   }
 
+  static async getTradeEntitiesForUser(
+    userId: string,
+    isRootAdmin: boolean,
+    category?: string,
+  ): Promise<TradeEntityRecord[]> {
+    if (isRootAdmin) {
+      return this.getTradeEntities(category);
+    }
+
+    const visibleUserIds = await this.getSubordinateUserIds(userId);
+    const placeholders = visibleUserIds.map(() => "?").join(",");
+    const params: any[] = [...visibleUserIds, ...visibleUserIds];
+    let query = `
+      SELECT *
+      FROM trade_entities
+      WHERE (created_by IN (${placeholders}) OR assigned_to IN (${placeholders}))
+    `;
+
+    if (category && category !== "all") {
+      query += " AND category = ?";
+      params.push(category);
+    }
+
+    query += " ORDER BY created_at DESC";
+    const [rows] = await pool.query<mysql.RowDataPacket[]>(query, params);
+    return rows as TradeEntityRecord[];
+  }
+
   static async createTradeEntity(trade: Omit<TradeEntityRecord, "id">): Promise<TradeEntityRecord> {
     const id = "trade-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
     await pool.query(
@@ -263,6 +291,49 @@ export class PharmaModel {
     if (userId) {
       query += " AND r.user_id = ?";
       params.push(userId);
+    }
+    if (dateFrom) {
+      query += " AND r.report_date >= ?";
+      params.push(dateFrom);
+    }
+    if (dateTo) {
+      query += " AND r.report_date <= ?";
+      params.push(dateTo);
+    }
+
+    query += " ORDER BY r.report_date DESC, r.created_at DESC";
+    const [rows] = await pool.query<mysql.RowDataPacket[]>(query, params);
+    return rows as DailyReportRecord[];
+  }
+
+  static async getDailyReportsForUser(
+    userId: string,
+    isRootAdmin: boolean,
+    requestedUserId?: string,
+    dateFrom?: string,
+    dateTo?: string,
+  ): Promise<DailyReportRecord[]> {
+    if (isRootAdmin) {
+      return this.getDailyReports(requestedUserId, dateFrom, dateTo);
+    }
+
+    const visibleUserIds = await this.getSubordinateUserIds(userId);
+    const requestedUserIsVisible = requestedUserId ? visibleUserIds.includes(requestedUserId) : true;
+    if (!requestedUserIsVisible) {
+      return [];
+    }
+
+    let query = `
+      SELECT r.*, p.full_name as user_name
+      FROM daily_reports r
+      LEFT JOIN profiles p ON r.user_id = p.id
+      WHERE r.user_id IN (${visibleUserIds.map(() => "?").join(",")})
+    `;
+    const params: any[] = [...visibleUserIds];
+
+    if (requestedUserId) {
+      query += " AND r.user_id = ?";
+      params.push(requestedUserId);
     }
     if (dateFrom) {
       query += " AND r.report_date >= ?";

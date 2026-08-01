@@ -1,24 +1,36 @@
 import { Router } from "express";
 import { PharmaController } from "../controllers/pharma.controller";
 import { asyncHandler } from "../utils/response";
-import { requireAuth, optionalAuth } from "../middleware/auth.middleware";
+import { requireAuth, requirePermission } from "../middleware/auth.middleware";
 
 const router = Router();
 
-// Doctors Management Routes
-router.get("/doctors", optionalAuth, asyncHandler(PharmaController.getDoctors));
-router.post("/doctors", optionalAuth, asyncHandler(PharmaController.createDoctor));
-router.put("/doctors/:id", requireAuth, asyncHandler(PharmaController.updateDoctor));
+const protect = (permission: string) => [requireAuth, requirePermission(permission)] as const;
 
-// Trade Entities Routes (Chemists, Wholesalers, Distributors)
-router.get("/trade-entities", optionalAuth, asyncHandler(PharmaController.getTradeEntities));
-router.post("/trade-entities", optionalAuth, asyncHandler(PharmaController.createTradeEntity));
+router
+  .route("/doctors")
+  .get(...protect("pharma:read"), asyncHandler(PharmaController.getDoctors))
+  .post(...protect("pharma:create"), asyncHandler(PharmaController.createDoctor));
+router.put(
+  "/doctors/:id",
+  ...protect("pharma:create"),
+  asyncHandler(PharmaController.updateDoctor),
+);
 
-// Work Station Daily Reports Routes
-router.get("/daily-reports", optionalAuth, asyncHandler(PharmaController.getDailyReports));
-router.post("/daily-reports", optionalAuth, asyncHandler(PharmaController.createDailyReport));
+router
+  .route("/trade-entities")
+  .get(...protect("trade:read"), asyncHandler(PharmaController.getTradeEntities))
+  .post(...protect("trade:create"), asyncHandler(PharmaController.createTradeEntity));
 
-// 3D Detailing Pharma Products Routes
-router.get("/pharma-products", optionalAuth, asyncHandler(PharmaController.getPharmaProducts));
+router
+  .route("/daily-reports")
+  .get(...protect("reports:read"), asyncHandler(PharmaController.getDailyReports))
+  .post(...protect("reports:create"), asyncHandler(PharmaController.createDailyReport));
+
+router.get(
+  "/pharma-products",
+  ...protect("detailing:read"),
+  asyncHandler(PharmaController.getPharmaProducts),
+);
 
 export default router;
