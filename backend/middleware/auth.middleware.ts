@@ -122,18 +122,6 @@ export function verifyToken(token: string): AuthenticatedUser {
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    // For development / testing fallback via headers
-    const mockUserId = req.headers["x-user-id"] as string;
-    if (mockUserId) {
-      const mockRoles = [(req.headers["x-user-role"] as string) || "admin"];
-      req.user = {
-        id: mockUserId,
-        email: (req.headers["x-user-email"] as string) || `${mockUserId}@company.com`,
-        roles: mockRoles,
-        permissions: resolveUserPermissions(mockRoles, ["all"]),
-      };
-      return next();
-    }
     throw new AppError("Authentication token required", 401);
   }
 
@@ -157,20 +145,10 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
         // Ignore invalid token in optionalAuth
       }
     }
-  } else {
-    const mockUserId = req.headers["x-user-id"] as string;
-    if (mockUserId) {
-      const mockRoles = [(req.headers["x-user-role"] as string) || "admin"];
-      req.user = {
-        id: mockUserId,
-        email: (req.headers["x-user-email"] as string) || `${mockUserId}@company.com`,
-        roles: mockRoles,
-        permissions: resolveUserPermissions(mockRoles, ["all"]),
-      };
-    }
   }
   next();
 }
+
 
 export function requireRole(...allowedRoles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
