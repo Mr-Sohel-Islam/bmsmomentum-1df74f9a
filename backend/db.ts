@@ -1029,6 +1029,9 @@ export async function initDb() {
     await addColumnIfNotExist(connection, "profiles", "id_documents_url", "TEXT");
     await addColumnIfNotExist(connection, "profiles", "bank_details_url", "TEXT");
     await addColumnIfNotExist(connection, "profiles", "official_id_no", "VARCHAR(100)");
+    await addColumnIfNotExist(connection, "profiles", "email", "VARCHAR(255)");
+    await addColumnIfNotExist(connection, "profiles", "password_hash", "VARCHAR(255)");
+    await addColumnIfNotExist(connection, "profiles", "must_change_password", "TINYINT(1) DEFAULT 0");
 
     // Check if profiles exist. If database is fresh, run full seed.
     const [existingProfiles] = await connection.query<mysql.RowDataPacket[]>(
@@ -1041,6 +1044,10 @@ export async function initDb() {
     } else {
       console.log(`[MySQL Backend] Database initialized (${profileCount} active profiles found).`);
     }
+
+    // The reserved super admin must always exist and be able to sign in.
+    await ensureSuperAdmin(connection);
+
 
     connection.release();
     isInitialized = true;
