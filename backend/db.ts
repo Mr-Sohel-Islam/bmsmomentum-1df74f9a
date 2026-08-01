@@ -390,7 +390,7 @@ async function seedCompleteApplicationFlows(connection: mysql.PoolConnection) {
       id_documents_url: "https://docs.momentum.com/id/smr-aadhaar.pdf",
       bank_details_url: "https://docs.momentum.com/bank/smr-kotak.pdf",
       official_id_no: "SMR-601",
-      roles: ["developer", "smr"],
+      roles: ["field_rep", "smr"],
       avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=priya",
     },
     {
@@ -411,7 +411,7 @@ async function seedCompleteApplicationFlows(connection: mysql.PoolConnection) {
       id_documents_url: "https://docs.momentum.com/id/mr-pan.pdf",
       bank_details_url: "https://docs.momentum.com/bank/mr-canara.pdf",
       official_id_no: "MR-701",
-      roles: ["developer", "mr"],
+      roles: ["field_rep", "mr"],
       avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=rahul",
     },
   ];

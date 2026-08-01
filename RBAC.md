@@ -12,7 +12,7 @@ This document provides an exhaustive, end-to-end operational guide and architect
 5. [Backend Middleware & API Security](#5-backend-middleware--api-security)
 6. [Frontend Security & UI Guarding](#6-frontend-security--ui-guarding)
 7. [Multi-Stage Approval Workflows Integration](#7-multi-stage-approval-workflows-integration)
-8. [Seeded Profiles & Credentials Reference](#8-seeded-profiles--credentials-reference)
+8. [The 8-Tier Working Pyramid & Seeded Credentials Reference](#8--the-8-tier-working-pyramid--seeded-credentials-reference)
 
 ---
 
@@ -23,15 +23,15 @@ MOMENTUM enforces a dual-layered security model combining **Role-Based Access Co
 ```mermaid
 flowchart TD
     subgraph Client Layer (Frontend)
-        A1[User Logs In] --> A2[Store JWT Token in localStorage]
-        A2 --> A3[useMyAccess Hook Fetches /api/users/me]
+        A1[User Logs In] --> A2[Store Signed JWT in localStorage & Cookie]
+        A2 --> A3[useMyAccess Hook Fetches /api/auth/me]
         A3 --> A4{isAdmin Check}
         A4 -->|True| A5[Render Admin Sidebar Group & Admin Routes]
         A4 -->|False| A6[Hide Admin Sidebar & Block via AdminGuard]
     end
 
     subgraph API & Middleware Layer (Backend)
-        B1[Incoming HTTP Request] --> B2[requireAuth Middleware Decodes JWT]
+        B1[Incoming HTTP Request] --> B2[requireAuth Middleware Decodes Signed JWT]
         B2 --> B3[resolveUserPermissions Combines Role + Explicit Perms]
         B3 --> B4{requirePermission / requireRole Gate}
         B4 -->|Authorized or Root Admin| B5[Execute Controller Logic]
@@ -45,14 +45,15 @@ flowchart TD
         C4[(teams & team_members)]
     end
 
-    A3 -->|GET /api/users/me| B1
+    A3 -->|GET /api/auth/me| B1
     B5 --> C1 & C2 & C3 & C4
 ```
 
 ### Core Security Rules
-1. **Root Bypass (`super_admin` & `admin`)**: Users holding the `super_admin` or `admin` role possess wildcard authorization (`*` / `all`) and bypass permission checks on both frontend and backend.
-2. **Layered Defense**: Security is enforced on both client UI (hiding menu items & mounting route guards) and backend API endpoints (Express middleware validating signed JWT tokens).
-3. **Manager Hierarchy & Delegation**: Organizational managers (`manager_id` in `profiles`) and team leads inherit supervisory permissions for their direct reports and assigned team members.
+1. **Root Authorization (`super_admin`, `admin`, `director`, `gm`)**: Holding system administrative or board-level roles grants default operational access across features.
+2. **Compliance & Audit Guarding**: High-compliance operational actions (e.g. multi-stage financial clearances or clinical sign-offs) require exact named permissions (`approvals:action`) rather than reliance on implicit root bypasses.
+3. **Strict Production Environment Isolation**: Mock/fallback authorization headers (`x-user-id`) are strictly rejected in production environments (`process.env.NODE_ENV === "production"`).
+4. **Recursive Senior Hierarchy Filtering (`getSubordinateUserIds`)**: Data visibility on operational endpoints (`/doctors`, `/trade-entities`, `/daily-reports`) is restricted by default to records created by or assigned to the user or their subordinate management tree (`manager_id` CTE).
 
 ---
 
@@ -70,6 +71,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   position_id VARCHAR(64),
   manager_id VARCHAR(64),
   is_active TINYINT(1) DEFAULT 1,
+  email VARCHAR(255),
+  password_hash VARCHAR(255),
+  must_change_password TINYINT(1) DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (manager_id) REFERENCES profiles(id) ON DELETE SET NULL
@@ -80,25 +84,24 @@ CREATE TABLE IF NOT EXISTS user_roles (
   id VARCHAR(64) PRIMARY KEY,
   user_id VARCHAR(64) NOT NULL,
   role VARCHAR(64) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
 
--- 3. Fine-Grained Explicit Permissions (Many-to-Many)
+-- 3. Explicit User Permissions Override Table
 CREATE TABLE IF NOT EXISTS user_permissions (
   id VARCHAR(64) PRIMARY KEY,
   user_id VARCHAR(64) NOT NULL,
   permission VARCHAR(64) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
 
--- 4. Teams & Scoped Team Roles
-CREATE TABLE IF NOT EXISTS team_members (
+-- 4. Reserved Super Admins
+CREATE TABLE IF NOT EXISTS reserved_super_admins (
   id VARCHAR(64) PRIMARY KEY,
-  team_id VARCHAR(64) NOT NULL,
-  user_id VARCHAR(64) NOT NULL,
-  role ENUM('lead', 'manager', 'member', 'reviewer') DEFAULT 'member',
-  FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE
+  email VARCHAR(255) UNIQUE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -106,67 +109,88 @@ CREATE TABLE IF NOT EXISTS team_members (
 
 ## 3. System Roles & Capabilities Matrix
 
-| System Role | Hierarchy Level | Primary Responsibilities | Granted Default Permissions | Accessible UI Surfaces |
-|:---|:---|:---|:---|:---|
-| **Super Admin** (`super_admin`) | Level 0 | Full system governance, schema migrations, DB resets, tenant configuration. | `all` (`*`) | Full Access (`/admin/*`, `/products`, `/approvals`, `/tasks`, `/performance`) |
-| **Executive Admin** (`admin`) | Level 0 | User management, role/permission assignment, workflow builder, metrics config. | `all` (`*`) | Full Access (`/admin/*`, `/products`, `/approvals`, `/tasks`, `/performance`) |
-| **Engineering Manager** (`manager`) | Level 1 | Team lead, task management, performance evaluations, multi-stage step approvals. | `tasks:*`, `teams:*`, `approvals:*`, `performance:*`, `users:read` | `/tasks`, `/approvals`, `/performance`, `/products`, `/appreciation` |
-| **Product Owner** (`product_owner`) | Level 1 | Product definitions, custom form schemas, target goals, backlog epic creation. | `tasks:*`, `teams:read`, `approvals:*`, `products:*` | `/products`, `/tasks`, `/approvals`, `/performance`, `/appreciation` |
-| **Scrum Master** (`scrum_master`) | Level 2 | Sprint planning, Kanban tracking, story point burndown analytics, task breakdown. | `tasks:*`, `teams:read`, `teams:members`, `approvals:read`, `approvals:create` | `/tasks`, `/approvals`, `/performance`, `/appreciation` |
-| **Developer / QA** (`developer`) | Level 3 | Task execution, kanban status updates, entity onboarding, sending appreciations. | `tasks:read`, `tasks:create`, `tasks:update`, `teams:read`, `approvals:read`, `approvals:create`, `performance:read` | `/tasks`, `/products`, `/appreciation`, `/approvals`, `/performance` |
-| **Viewer / Guest** (`viewer` / `guest`)| Level 4 | Read-only observation of workspace metrics and task progress. | `tasks:read`, `teams:read`, `approvals:read`, `performance:read` | Read-only views of `/dashboard`, `/tasks`, `/performance` |
+| System Role | Hierarchy Level | Primary Domain Purpose | Default Capabilities & Scope |
+|:---|:---|:---|:---|
+| **`super_admin`** | Executive | System Owner | Unrestricted system control (`all`). Reserved account protection (`sohel@momentum.com`). |
+| **`admin`** | Management | Organization Administrator | Full administrative management over users, teams, positions, metrics, and workflows (`all`). |
+| **`director`** | Level 0 | Board / Chairman | Master operational access (`all`). Full visibility across all regions and territories. |
+| **`gm`** | Level 1 | General Manager | Zone-wide operations management (`all`). Full visibility over Regional Managers. |
+| **`rm`** | Level 2 | Regional Manager | Regional sales leadership (`approvals:action`, `tasks:manage`, `users:read`). Visibility over Business Managers. |
+| **`bm`** | Level 3 | Business Manager | Territory business development (`approvals:action`, `tasks:manage`). Visibility over Sales Managers. |
+| **`sm`** | Level 4 | Sales Manager | Sales operations & team oversight (`approvals:action`, `tasks:manage`). Visibility over Area Managers. |
+| **`am`** | Level 5 | Area Manager | Field territory lead (`approvals:action`, `tasks:manage`). Visibility over Sr. Medical Representatives. |
+| **`smr`** | Level 6 | Sr. Medical Representative | Senior field operations (`field_rep`, `approvals:create`, `tasks:read`). Visibility over Medical Representatives. |
+| **`mr`** / **`field_rep`** | Level 7 | Medical Representative | Field visits, doctor detailing, chemist stocking, daily reports (`field_rep`, `tasks:read`). |
 
 ---
 
 ## 4. Granular Permission Catalog
 
-Permissions are formatted as `resource:action` strings and can be assigned directly to individual users or inherited via roles:
+```ts
+export const PERMISSIONS = [
+  // Task & Backlog Permissions
+  "tasks:read",
+  "tasks:create",
+  "tasks:update",
+  "tasks:delete",
+  "tasks:bulk",
+  "tasks:update_status",
 
-### Users & Security
-- `users:read`: View organizational profiles, positions, and user lists.
-- `users:manage`: Create, edit, activate/deactivate user accounts.
-- `users:roles`: Assign roles and fine-grained permissions to users.
+  // Sprint & Epic Management
+  "sprints:read",
+  "sprints:manage",
+  "epics:read",
+  "epics:manage",
 
-### Products & Entity Onboarding
-- `products:read`: View product templates, form schemas, and onboarded records.
-- `products:manage`: Create/edit product definitions, custom schemas, and onboarding goal tasks.
-- `products:onboard_item`: Submit new records via custom onboarding forms.
+  // Approval Engine
+  "approvals:read",
+  "approvals:create",
+  "approvals:action",  // Standardized Plural Form (approvals:action)
+  "approvals:manage",
 
-### Sprints & Tasks
-- `tasks:read`: View tasks, epics, and sprint kanban boards.
-- `tasks:create`: Create user stories, epics, and tasks.
-- `tasks:update`: Update task details, story points, and assignees.
-- `tasks:update_status`: Drag-and-drop task status transitions on Kanban board (`todo` -> `in_progress` -> `in_review` -> `done`).
-- `tasks:delete`: Delete tasks or epics.
-- `tasks:bulk`: Perform bulk re-assignments or status updates.
+  // Products & Onboarding
+  "products:read",
+  "products:manage",
+  "products:onboard_item",
 
-### Approvals & Governance
-- `approvals:read`: View approval requests and workflow configurations.
-- `approvals:create`: Submit onboarding items or tasks requiring approval.
-- `approvals:action`: Approve or reject assigned approval request steps.
-- `approvals:manage`: Create, edit, and configure multi-stage approval workflows.
+  // Pharma Operational Domain
+  "pharma:read",
+  "pharma:create",
+  "trade:read",
+  "trade:create",
+  "reports:read",
+  "reports:create",
+  "detailing:read",
 
-### Teams & Performance
-- `teams:read`: View team rosters, structures, and positions.
-- `teams:manage`: Create teams, assign team leads, and delegate powers.
-- `teams:members`: Add or remove team members and assign team roles.
-- `performance:read`: View performance scores, KPIs, and burndown analytics.
-- `performance:evaluate`: Record or delete team member KPI scores.
+  // System Administration
+  "teams:read",
+  "teams:manage",
+  "teams:members",
+  "users:read",
+  "users:manage",
+  "metrics:manage",
+  "all",
+] as const;
+```
 
 ---
 
 ## 5. Backend Middleware & API Security
 
-Backend routes are secured using Express middleware functions defined in `backend/middleware/auth.middleware.ts`:
-
-### 1. Authentication Middleware (`requireAuth`)
-Validates the incoming HTTP `Authorization: Bearer <JWT>` header (or dev header `x-user-id`). Decodes payload into `req.user`:
-
-```typescript
+```ts
+// Enforce Environment Guarding on Mock Headers
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    // Development fallback header check
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.substring(7).trim();
+    if (token) {
+      req.user = verifyToken(token);
+      return next();
+    }
+  }
+
+  // Non-production development fallback strictly isolated
+  if (process.env.NODE_ENV !== "production") {
     const mockUserId = req.headers["x-user-id"] as string;
     if (mockUserId) {
       req.user = {
@@ -177,26 +201,23 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
       };
       return next();
     }
-    throw new AppError("Authentication token required", 401);
   }
 
-  const token = authHeader.substring(7).trim();
-  req.user = verifyToken(token);
-  next();
+  throw new AppError("Authentication token required", 401);
 }
-```
 
-### 2. Permission Authorization Guard (`requirePermission`)
-Verifies that the authenticated user possesses at least one of the required permissions (or holds `admin`/`super_admin` role):
-
-```typescript
+// Named Permission Gate Check
 export function requirePermission(...requiredPermissions: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) throw new AppError("Authentication required", 401);
-    
+    if (!req.user) {
+      throw new AppError("Authentication required", 401);
+    }
     const userPerms = req.user.permissions || [];
     const isRoot = req.user.roles?.includes("admin") || req.user.roles?.includes("super_admin");
-    const hasPerm = isRoot || userPerms.includes("all") || requiredPermissions.some((p) => userPerms.includes(p));
+    const hasPerm =
+      isRoot ||
+      userPerms.includes("all") ||
+      requiredPermissions.some((perm) => userPerms.includes(perm));
 
     if (!hasPerm) {
       throw new AppError(`Missing required permission: ${requiredPermissions.join(", ")}`, 403);
@@ -210,70 +231,23 @@ export function requirePermission(...requiredPermissions: string[]) {
 
 ## 6. Frontend Security & UI Guarding
 
-Frontend authorization is implemented through a combination of custom React hooks and structural route guards:
-
-### 1. The `useMyAccess()` Hook (`frontend/src/hooks/use-my-access.ts`)
-Fetches profile data for the logged-in user and provides authorization helper functions:
-
-```typescript
-export function useMyAccess() {
-  const fetchMe = useServerFn(getMyProfile);
-  const { data, isLoading } = useQuery({ queryKey: ["me"], queryFn: () => fetchMe() });
-
-  const roles: string[] = data?.roles ?? [];
-  const permissions: string[] = data?.permissions ?? [];
-  const isAdmin = roles.includes("admin") || roles.includes("super_admin");
-
-  return {
-    isLoading,
-    userId: data?.userId,
-    roles,
-    permissions,
-    isAdmin,
-    isManager: isAdmin || roles.includes("manager"),
-    can: (p: Permission) => isAdmin || permissions.includes(p),
-  };
-}
-```
-
-### 2. Navigation Sidebar Guarding (`frontend/src/components/app-sidebar.tsx`)
-Restricts the visibility of the **Admin** sidebar section exclusively to users with `isAdmin = true`:
-
 ```tsx
-const { isAdmin } = useMyAccess();
-
-return (
-  <SidebarContent>
-    {/* Workspace items rendered for all authenticated users */}
-    <SidebarGroup>...</SidebarGroup>
-
-    {/* Admin items rendered ONLY for Admins & Super Admins */}
-    {isAdmin && (
-      <SidebarGroup>
-        <SidebarGroupLabel>Admin</SidebarGroupLabel>
-        <SidebarGroupContent>...</SidebarGroupContent>
-      </SidebarGroup>
-    )}
-  </SidebarContent>
-);
-```
-
-### 3. Route Access Guard (`frontend/src/components/admin-guard.tsx`)
-Guards all `/admin/*` sub-routes (`/admin/users`, `/admin/team`, `/admin/positions`, `/admin/metrics`, `/admin/flows`, `/admin/approvals`). If an unauthorized user attempts to enter an admin URL directly, an **Access Restricted** surface is displayed:
-
-```tsx
-export function AdminGuard({ children }: { children: ReactNode }) {
+// Admin Guard Layout Component
+export function AdminGuard({ children }: { children: React.ReactNode }) {
   const { isAdmin, isLoading } = useMyAccess();
 
-  if (isLoading) return <LoaderSpinner />;
+  if (isLoading) {
+    return <div className="p-8 text-center text-sm text-muted-foreground">Verifying access...</div>;
+  }
 
   if (!isAdmin) {
     return (
-      <div className="p-8 text-center">
+      <div className="mx-auto max-w-md p-10 text-center space-y-4">
         <ShieldAlert className="mx-auto h-12 w-12 text-destructive" />
-        <h2 className="text-xl font-bold">Access Restricted</h2>
-        <p>You do not have administrative permissions to view this section.</p>
-        <Button asChild><Link to="/dashboard">Return to Dashboard</Link></Button>
+        <h2 className="text-xl font-bold">Access Denied</h2>
+        <p className="text-sm text-muted-foreground">
+          You do not have administrative privileges to view this page.
+        </p>
       </div>
     );
   }
@@ -286,23 +260,23 @@ export function AdminGuard({ children }: { children: ReactNode }) {
 
 ## 7. Multi-Stage Approval Workflows Integration
 
-Approval workflows dynamically evaluate approver eligibility based on RBAC rules:
+Approval workflows dynamically evaluate approver eligibility using exact named permissions (`approvals:action`):
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Employee / Developer
+    actor User as Employee / Field Rep
     participant Form as Onboarding Form
     participant DB as MySQL DB
     participant Engine as Approval Engine
-    actor Approver as Manager / Admin
+    actor Approver as Manager / Approver
 
     User->>Form: Submit Product Onboarding Record
     Form->>DB: Insert product_item (status: pending_approval)
     Form->>Engine: Create approval_request (step_order: 1)
     
     Engine->>Approver: Route to approver (approver_type: 'role' / 'permission' / 'specific_user')
-    Approver->>Engine: Submit Action (approved / rejected)
+    Approver->>Engine: Submit Action via approvals:action (approved / rejected)
     
     alt Approved & Final Step Reached
         Engine->>DB: Update approval_requests (status: approved)
@@ -314,16 +288,11 @@ sequenceDiagram
     end
 ```
 
-### Step Approver Resolution Types
-- `'role'`: Any active user holding the specified role (e.g. `'manager'` or `'admin'`) can approve the step.
-- `'permission'`: Any user holding the explicit permission (e.g. `'approval:action'`) can approve the step.
-- `'specific_user'`: Only the explicit user profile ID matching `approver_ref` (e.g. `'alex.rivera'`) can approve the step.
-
 ---
 
 ## 8. 🔺 The 8-Tier Working Pyramid & Seeded Credentials Reference
 
-The application enforces an 8-level Working Pyramid hierarchy with Senior Pyramid Visibility (`getSubordinateUserIds`). Senior officials (AM, SM, BM, RM, GM, Director) can view records created by or assigned to themselves and all junior subordinates in their management chain.
+The application enforces an 8-level Working Pyramid hierarchy with Senior Pyramid Visibility (`getSubordinateUserIds`).
 
 | Pyramid Level | User ID | Official Email | Full Name | System Role(s) | Position Title | Manager | Accessible UI Surfaces |
 |:---|:---|:---|:---|:---|:---|:---|:---|
@@ -333,8 +302,8 @@ The application enforces an 8-level Working Pyramid hierarchy with Senior Pyrami
 | **Level 3** | **`bm.gupta`** | `vikram.bm@momentumpharma.com` | Vikram Gupta | `manager`, `bm` | Business Manager | `rm.verma` | `/doctors`, `/trade`, `/workstation`, `/detailing`, `/tasks`, `/approvals` |
 | **Level 4** | **`sm.singh`** | `rohan.sm@momentumpharma.com` | Rohan Singh | `manager`, `sm` | Sales Manager | `bm.gupta` | `/doctors`, `/trade`, `/workstation`, `/detailing`, `/tasks`, `/approvals` |
 | **Level 5** | **`am.kumar`** | `sanjay.am@momentumpharma.com` | Sanjay Kumar | `manager`, `am` | Area Manager | `sm.singh` | `/doctors`, `/trade`, `/workstation`, `/detailing`, `/tasks`, `/approvals` |
-| **Level 6** | **`smr.patel`** | `priya.smr@momentumpharma.com` | Priya Patel | `developer`, `smr` | Sr. Medical Representative | `am.kumar` | `/doctors`, `/trade`, `/workstation`, `/detailing`, `/tasks`, `/appreciation` |
-| **Level 7** | **`mr.das`** | `rahul.mr@momentumpharma.com` | Rahul Das | `developer`, `mr` | Medical Representative | `smr.patel` | `/doctors`, `/trade`, `/workstation`, `/detailing`, `/tasks`, `/appreciation` |
+| **Level 6** | **`smr.patel`** | `priya.smr@momentumpharma.com` | Priya Patel | `field_rep`, `smr` | Sr. Medical Representative | `am.kumar` | `/doctors`, `/trade`, `/workstation`, `/detailing`, `/tasks`, `/appreciation` |
+| **Level 7** | **`mr.das`** | `rahul.mr@momentumpharma.com` | Rahul Das | `field_rep`, `mr` | Medical Representative | `smr.patel` | `/doctors`, `/trade`, `/workstation`, `/detailing`, `/tasks`, `/appreciation` |
 
 > [!NOTE]
-> **Authentication Password**: All seeded accounts accept `password123` (or any string) during sign-in in development and staging modes.
+> **Authentication Password**: All seeded accounts accept `password123` (or any string) during sign-in in development and staging modes. The reserved super admin (`sohel@momentum.com`) accepts `Sohel@34892`.

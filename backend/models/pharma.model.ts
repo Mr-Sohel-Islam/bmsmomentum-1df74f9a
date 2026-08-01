@@ -75,20 +75,37 @@ export interface PharmaProductRecord {
 }
 
 export class PharmaModel {
-  // Helper to recursively get all subordinate user IDs in the pyramid
+  // Helper to recursively get all subordinate user IDs in the pyramid using CTE with BFS fallback
   static async getSubordinateUserIds(userId: string): Promise<string[]> {
-    const connection = pool;
+    try {
+      const [rows] = await pool.query<mysql.RowDataPacket[]>(
+        `WITH RECURSIVE pyramid_hierarchy AS (
+          SELECT id FROM profiles WHERE id = ?
+          UNION ALL
+          SELECT p.id FROM profiles p
+          INNER JOIN pyramid_hierarchy h ON p.manager_id = h.id
+        )
+        SELECT id FROM pyramid_hierarchy`,
+        [userId]
+      );
+      if (rows && rows.length > 0) {
+        return rows.map((r) => r.id as string);
+      }
+    } catch {
+      // Fallback BFS traversal
+    }
+
     const subordinates = new Set<string>([userId]);
     let queue = [userId];
 
     while (queue.length > 0) {
       const currentId = queue.shift()!;
-      const [rows] = await connection.query<mysql.RowDataPacket[]>(
+      const [rows] = await pool.query<mysql.RowDataPacket[]>(
         "SELECT id FROM profiles WHERE manager_id = ?",
         [currentId]
       );
       for (const row of rows) {
-        if (!subordinates.has(row.id)) {
+        if (row.id && !subordinates.has(row.id)) {
           subordinates.add(row.id);
           queue.push(row.id);
         }
