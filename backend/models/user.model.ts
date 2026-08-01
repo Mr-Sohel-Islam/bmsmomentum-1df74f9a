@@ -1,20 +1,24 @@
 import { RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import { pool } from "../db";
 import { crypto } from "../utils";
+import { hashPassword, verifyPassword, normalizeEmail } from "../utils/password";
 
 export interface Profile {
   id: string;
+  email?: string | null;
   full_name: string | null;
   avatar_url: string | null;
   department?: string | null;
   position_id?: string | null;
   manager_id?: string | null;
   is_active?: boolean;
+  must_change_password?: boolean;
   roles?: string[];
   permissions?: string[];
   created_at?: string;
   updated_at?: string;
 }
+
 
 export interface UserRole {
   id: string;
