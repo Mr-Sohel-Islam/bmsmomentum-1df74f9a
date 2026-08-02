@@ -727,11 +727,11 @@ async function seedCompleteApplicationFlows(connection: mysql.PoolConnection) {
     );
   }
 
-  // 8. Teams & Workflows
+  // 8. Teams
   const team1 = "team-field-ops";
   await connection.query(
     "INSERT INTO teams (id, name, description, lead_id) VALUES (?, ?, ?, ?)",
-    [team1, "Central Delhi Territory Operations", "Field sales, doctor detailing, and chemist network management.", "am.kumar"]
+    [team1, "Kolkata & Delhi Territory Operations", "Field sales, doctor detailing, chemist network, and multi-stage onboarding.", "am.kumar"]
   );
 
   await connection.query(
@@ -740,6 +740,215 @@ async function seedCompleteApplicationFlows(connection: mysql.PoolConnection) {
       team1 + "-am", team1, "am.kumar", "manager",
       team1 + "-smr", team1, "smr.patel", "lead",
       team1 + "-mr", team1, "mr.das", "member",
+    ]
+  );
+
+  // 9. Sprints & Backlog Tasks
+  const sprintId = "sprint-24-1";
+  const now = new Date();
+  const startDate = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 19).replace('T', ' ');
+  const endDate = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 19).replace('T', ' ');
+
+  await connection.query(
+    `INSERT INTO sprints (id, name, goal, status, start_date, end_date, target_points, completed_points)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      sprintId,
+      "Sprint 24.1 (Field & Governance Rollout)",
+      "Roll out 3D visual detailing, doctor anniversary tracking, City Pharma trade onboarding, and multi-stage product approval.",
+      "active",
+      startDate,
+      endDate,
+      40,
+      28,
+    ]
+  );
+
+  const epicId = "epic-field-expansion";
+  await connection.query(
+    `INSERT INTO epics (id, name, description, status, team_id)
+     VALUES (?, ?, ?, ?, ?)`,
+    [
+      epicId,
+      "Kolkata & Delhi Territory Field Execution",
+      "Expand doctor relationship network, onboard retail chemists, and streamline product approvals.",
+      "in_progress",
+      team1,
+    ]
+  );
+
+  const tasksData = [
+    {
+      id: "task-1",
+      title: "Present MOMENTUM-CV 625 3D Detailing Card to Dr. Sharma",
+      description: "Demonstrate 3D clinical benefits, composition, MRP/PTR/PTS pricing on tablet at Park Street clinic.",
+      status: "done",
+      points: 5,
+      assignee_id: "mr.das",
+      epic_id: epicId,
+      sprint_id: sprintId,
+      team_id: team1,
+      created_by: "smr.patel",
+    },
+    {
+      id: "task-2",
+      title: "Capture Dr. Sharma Anniversary & Gift Acceptance Details",
+      description: "Log anniversary date (Dec 10), spouse DOB, and stethoscope gift acceptance details into Doctors Management.",
+      status: "done",
+      points: 3,
+      assignee_id: "mr.das",
+      epic_id: epicId,
+      sprint_id: sprintId,
+      team_id: team1,
+      created_by: "mr.das",
+    },
+    {
+      id: "task-3",
+      title: "Onboard City Pharma to Trade Network (D.L. & GST Verification)",
+      description: "Register City Pharma chemist store under Park Circus with D.L. DL-20B/KOL/94821 and 10+2 promotional scheme.",
+      status: "done",
+      points: 8,
+      assignee_id: "mr.das",
+      epic_id: epicId,
+      sprint_id: sprintId,
+      team_id: team1,
+      created_by: "mr.das",
+    },
+    {
+      id: "task-4",
+      title: "Submit Daily Workstation Field Activity & Collections",
+      description: "Record 2 doctor visits, 1 chemist visit, and ₹15,000 billing / ₹10,000 collection into daily_reports.",
+      status: "done",
+      points: 5,
+      assignee_id: "mr.das",
+      epic_id: epicId,
+      sprint_id: sprintId,
+      team_id: team1,
+      created_by: "mr.das",
+    },
+    {
+      id: "task-5",
+      title: "Onboard Specialty Brand Item: MOMENTUM CardioPlus 10mg",
+      description: "Submit product onboarding item for multi-stage manager approval under /products surface.",
+      status: "in_progress",
+      points: 12,
+      assignee_id: "mr.das",
+      epic_id: epicId,
+      sprint_id: sprintId,
+      team_id: team1,
+      created_by: "mr.das",
+    },
+    {
+      id: "task-6",
+      title: "Review & Approve Regional Product Onboarding Request",
+      description: "Regional Manager Amit Verma evaluates Rahul Das's onboarding request under /approvals queue.",
+      status: "in_progress",
+      points: 7,
+      assignee_id: "rm.verma",
+      epic_id: epicId,
+      sprint_id: sprintId,
+      team_id: team1,
+      created_by: "gm.sharma",
+    },
+  ];
+
+  for (const t of tasksData) {
+    await connection.query(
+      `INSERT INTO tasks (id, title, description, status, points, assignee_id, epic_id, sprint_id, team_id, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [t.id, t.title, t.description, t.status, t.points, t.assignee_id, t.epic_id, t.sprint_id, t.team_id, t.created_by]
+    );
+  }
+
+  // 10. Approval Workflows & Product Onboarding Engine
+  const workflowId = "wf-product-onboarding";
+  await connection.query(
+    `INSERT INTO approval_workflows (id, name, description, entity_type, active, created_by)
+     VALUES (?, ?, ?, ?, 1, ?)`,
+    [
+      workflowId,
+      "Product Onboarding & Special Brand Verification",
+      "Multi-stage approval workflow for onboarding pharmaceutical brand items and trade discounts.",
+      "product_onboarding",
+      "director.main",
+    ]
+  );
+
+  const stepId = "step-1-manager";
+  await connection.query(
+    `INSERT INTO approval_steps (id, workflow_id, step_order, approver_type, approver_ref, approver_id)
+     VALUES (?, ?, 1, 'permission', 'approvals:action', 'rm.verma')`,
+    [stepId, workflowId]
+  );
+
+  const productTemplateId = "prod-specialty-brand";
+  await connection.query(
+    `INSERT INTO products (id, name, product_type, category, sku, status, custom_fields, form_schema, approval_settings, created_by)
+     VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)`,
+    [
+      productTemplateId,
+      "Specialty Brand Onboarding Item",
+      "Pharmaceutical Onboarding",
+      "Cardiology",
+      "SKU-CARDIO-PLUS-10",
+      JSON.stringify({ target_region: "Kolkata & Delhi", priority: "High" }),
+      JSON.stringify({ fields: [{ name: "item_name", label: "Item Name", type: "text", required: true }] }),
+      JSON.stringify({ require_approval: true, workflow_id: workflowId }),
+      "director.main",
+    ]
+  );
+
+  const productItemId = "item-cardio-plus";
+  const approvalRequestId = "req-cardio-plus";
+
+  await connection.query(
+    `INSERT INTO product_items (id, product_id, item_name, status, approval_request_id, custom_fields, created_by)
+     VALUES (?, ?, ?, 'pending_approval', ?, ?, ?)`,
+    [
+      productItemId,
+      productTemplateId,
+      "MOMENTUM CardioPlus 10mg Specialty Item",
+      approvalRequestId,
+      JSON.stringify({ brand: "CardioPlus", dosage: "10mg", territory: "Kolkata Park Circus Zone" }),
+      "mr.das",
+    ]
+  );
+
+  await connection.query(
+    `INSERT INTO approval_requests (id, workflow_id, requester_id, entity_type, entity_id, title, description, status, current_step_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 1)`,
+    [
+      approvalRequestId,
+      workflowId,
+      "mr.das",
+      "product_onboarding",
+      productItemId,
+      "Onboard MOMENTUM CardioPlus 10mg Specialty Item",
+      "Submitted by Rahul Das (MR - Level 7) for clinic distribution in Kolkata territory.",
+    ]
+  );
+
+  await connection.query(
+    `INSERT INTO approval_actions (id, request_id, approver_id, step_order, decision, note)
+     VALUES (?, ?, ?, 1, 'approved', ?)`,
+    [
+      "act-amit-approved",
+      approvalRequestId,
+      "rm.verma",
+      "Approved regional specialty brand item for Kolkata territory after compliance review.",
+    ]
+  );
+
+  // 11. Appreciations
+  await connection.query(
+    `INSERT INTO appreciations (id, sender_id, recipient_id, message, badge_type)
+     VALUES (?, ?, ?, ?, ?)`,
+    [
+      "appr-1",
+      "rm.verma",
+      "mr.das",
+      "Outstanding field performance in Kolkata! Excellent work capturing Dr. Sharma's anniversary and onboarding City Pharmacy.",
+      "Excellence",
     ]
   );
 
