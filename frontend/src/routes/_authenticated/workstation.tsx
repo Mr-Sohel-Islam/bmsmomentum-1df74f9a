@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { Briefcase, Plus, Calendar, Stethoscope, Store, Building2, Truck, DollarSign, Award, CheckCircle2 } from "lucide-react";
+import { Briefcase, Plus, Calendar, Stethoscope, Store, Sparkles, Building2, Truck, DollarSign, Award, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,7 @@ export const Route = createFileRoute("/_authenticated/workstation")({
 });
 
 function WorkstationPage() {
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const addReport = useServerFn(createDailyReport);
 
@@ -215,9 +216,9 @@ function WorkstationPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label>Offers / Samples Distributed</Label>
+                <Label>Promotional Offers Distributed</Label>
                 <Input
-                  placeholder="e.g. 5 boxes of MOMENTUM-CV 625 samples & Doctor Pen Sets"
+                  placeholder="e.g. 10+2 scheme coupons, Pen sets, Free samples"
                   value={offers}
                   onChange={(e) => setOffers(e.target.value)}
                 />
@@ -226,16 +227,16 @@ function WorkstationPage() {
               <div className="space-y-1.5">
                 <Label>Special Achievements / Major Conversions</Label>
                 <Textarea
-                  placeholder="e.g. Converted Dr. Swaminathan for monthly 100-strip commitment..."
+                  placeholder="e.g. Converted Dr. Swaminathan for monthly 100-strip commitment"
                   value={achievements}
                   onChange={(e) => setAchievements(e.target.value)}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label>Additional Field Notes</Label>
-                <Input
-                  placeholder="Any additional remarks..."
+                <Label>Field Notes & Observations</Label>
+                <Textarea
+                  placeholder="e.g. Competitor pricing notes, stock availability in CP market"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                 />
@@ -249,6 +250,99 @@ function WorkstationPage() {
             </form>
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Quick Action Tiles Section */}
+      <div className="space-y-3">
+        <p className="font-mono text-xs uppercase tracking-widest text-primary font-semibold">
+          Operational Module Shortcuts
+        </p>
+
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Tile 1: Doctors Management */}
+          <div
+            onClick={() => navigate({ to: "/doctors" })}
+            className="group relative rounded-xl border border-border/80 bg-card/60 backdrop-blur-md p-4 shadow-sm transition-all duration-300 hover:border-blue-500/50 hover:bg-card hover:shadow-md hover:-translate-y-1 cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                <Stethoscope className="h-5 w-5" />
+              </div>
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted group-hover:bg-blue-500/20 text-muted-foreground group-hover:text-blue-400 transition-colors">
+                <Plus className="h-4 w-4" />
+              </div>
+            </div>
+            <h3 className="mt-3 text-base font-bold tracking-tight text-foreground group-hover:text-blue-400 transition-colors">
+              Doctors Management
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+              Add doctor profiles, log gift acceptances, anniversaries & territory assignments.
+            </p>
+          </div>
+
+          {/* Tile 2: Trade & Chemists Network */}
+          <div
+            onClick={() => navigate({ to: "/trade" })}
+            className="group relative rounded-xl border border-border/80 bg-card/60 backdrop-blur-md p-4 shadow-sm transition-all duration-300 hover:border-emerald-500/50 hover:bg-card hover:shadow-md hover:-translate-y-1 cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                <Store className="h-5 w-5" />
+              </div>
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted group-hover:bg-emerald-500/20 text-muted-foreground group-hover:text-emerald-400 transition-colors">
+                <Plus className="h-4 w-4" />
+              </div>
+            </div>
+            <h3 className="mt-3 text-base font-bold tracking-tight text-foreground group-hover:text-emerald-400 transition-colors">
+              Trade & Chemists
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+              Register Chemists, Wholesalers, Distributors & Drug License numbers.
+            </p>
+          </div>
+
+          {/* Tile 3: 3D Product Detailing */}
+          <div
+            onClick={() => navigate({ to: "/detailing" })}
+            className="group relative rounded-xl border border-border/80 bg-card/60 backdrop-blur-md p-4 shadow-sm transition-all duration-300 hover:border-purple-500/50 hover:bg-card hover:shadow-md hover:-translate-y-1 cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/10 text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted group-hover:bg-purple-500/20 text-muted-foreground group-hover:text-purple-400 transition-colors">
+                <Plus className="h-4 w-4" />
+              </div>
+            </div>
+            <h3 className="mt-3 text-base font-bold tracking-tight text-foreground group-hover:text-purple-400 transition-colors">
+              3D Visual Detailing
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+              Launch interactive 3D visual cards, MRP/PTR/PTS pricing & clinical benefits.
+            </p>
+          </div>
+
+          {/* Tile 4: Submit Daily Workstation Log */}
+          <div
+            onClick={() => setOpen(true)}
+            className="group relative rounded-xl border border-emerald-500/30 bg-emerald-500/5 backdrop-blur-md p-4 shadow-sm transition-all duration-300 hover:border-emerald-500/60 hover:bg-emerald-500/10 hover:shadow-md hover:-translate-y-1 cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500 text-slate-950 font-bold">
+                <Briefcase className="h-5 w-5" />
+              </div>
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-slate-950 transition-colors">
+                <Plus className="h-4 w-4" />
+              </div>
+            </div>
+            <h3 className="mt-3 text-base font-bold tracking-tight text-emerald-400">
+              Submit Activity Log
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+              Record daily doctor/chemist visits, collections, billing, and achievements.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Aggregate Metrics Bar */}
