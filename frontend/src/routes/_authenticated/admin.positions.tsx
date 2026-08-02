@@ -42,12 +42,16 @@ type Position = {
   parent_position_id: string | null;
 };
 
+import { apiClient } from "@/lib/api-client";
+
 function PositionsPage() {
   const qc = useQueryClient();
-  const list = useServerFn(listPositions);
   const create = useServerFn(createPosition);
   const remove = useServerFn(deletePosition);
-  const { data, isLoading } = useQuery({ queryKey: ["positions"], queryFn: () => list() });
+  const { data, isLoading } = useQuery({
+    queryKey: ["positions"],
+    queryFn: () => apiClient.get<Position[]>("/positions"),
+  });
 
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");

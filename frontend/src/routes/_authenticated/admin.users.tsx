@@ -45,18 +45,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  listUsers,
   createUser,
   setUserRoles,
   setUserPermissions,
   resetUserPassword,
   updateUserProfile,
   deleteUser,
-  listPositions,
   ROLES,
   type Permission,
   type Role,
 } from "@/lib/admin.functions";
+import { apiClient } from "@/lib/api-client";
 
 import { AdminGuard } from "@/components/admin-guard";
 
@@ -163,10 +162,14 @@ const PERMISSION_GROUPS: {
 ];
 
 function UsersPage() {
-  const list = useServerFn(listUsers);
-  const listPos = useServerFn(listPositions);
-  const { data, isLoading } = useQuery({ queryKey: ["users"], queryFn: () => list() });
-  const { data: positions } = useQuery({ queryKey: ["positions"], queryFn: () => listPos() });
+  const { data, isLoading } = useQuery({
+    queryKey: ["users"],
+    queryFn: () => apiClient.get<UserRow[]>("/profiles"),
+  });
+  const { data: positions } = useQuery({
+    queryKey: ["positions"],
+    queryFn: () => apiClient.get<Position[]>("/positions"),
+  });
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");

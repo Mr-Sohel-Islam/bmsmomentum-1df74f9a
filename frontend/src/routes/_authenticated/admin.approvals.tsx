@@ -56,10 +56,10 @@ export const Route = createFileRoute("/_authenticated/admin/approvals")({
   component: AdminApprovalsPage,
 });
 
+import { apiClient } from "@/lib/api-client";
+
 function AdminApprovalsPage() {
   const qc = useQueryClient();
-  const fetchWorkflows = useServerFn(listWorkflows);
-  const fetchUsers = useServerFn(listUsers);
   const create = useServerFn(createWorkflow);
   const update = useServerFn(updateWorkflow);
   const remove = useServerFn(deleteWorkflow);
@@ -68,9 +68,12 @@ function AdminApprovalsPage() {
 
   const { data: workflows = [], isLoading } = useQuery({
     queryKey: ["workflows"],
-    queryFn: () => fetchWorkflows(),
+    queryFn: () => apiClient.get<Workflow[]>("/approvals/workflows"),
   });
-  const { data: users = [] } = useQuery({ queryKey: ["admin-users"], queryFn: () => fetchUsers() });
+  const { data: users = [] } = useQuery({
+    queryKey: ["admin-users"],
+    queryFn: () => apiClient.get<AdminUser[]>("/profiles"),
+  });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["workflows"] });
   const onErr = (e: { message?: string }) => toast.error(e?.message ?? "Action failed");

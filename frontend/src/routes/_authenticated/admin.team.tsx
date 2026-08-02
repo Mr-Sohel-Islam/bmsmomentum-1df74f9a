@@ -76,21 +76,27 @@ function currentPeriod() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function TeamPage() {
-  const scoresFn = useServerFn(listTeamScores);
-  const metricsFn = useServerFn(listMetrics);
-  const usersFn = useServerFn(listUsers);
-  const teamsFn = useServerFn(listTeams);
+import { apiClient } from "@/lib/api-client";
 
+function TeamPage() {
   const qc = useQueryClient();
 
   const { data: scores, isLoading } = useQuery({
     queryKey: ["team-scores"],
-    queryFn: () => scoresFn(),
+    queryFn: () => apiClient.get<Score[]>("/performance/scores"),
   });
-  const { data: metrics } = useQuery({ queryKey: ["metrics"], queryFn: () => metricsFn() });
-  const { data: users } = useQuery({ queryKey: ["users"], queryFn: () => usersFn() });
-  const { data: teamsData } = useQuery({ queryKey: ["teams"], queryFn: () => teamsFn() });
+  const { data: metrics } = useQuery({
+    queryKey: ["metrics"],
+    queryFn: () => apiClient.get<any[]>("/metrics"),
+  });
+  const { data: users } = useQuery({
+    queryKey: ["users"],
+    queryFn: () => apiClient.get<UserOption[]>("/profiles"),
+  });
+  const { data: teamsData } = useQuery({
+    queryKey: ["teams"],
+    queryFn: () => apiClient.get<Team[]>("/teams"),
+  });
 
   const [filterMetric, setFilterMetric] = useState<string>("all");
   const [filterPeriod, setFilterPeriod] = useState<string>("all");
