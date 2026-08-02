@@ -34,6 +34,13 @@ function AuthedLayout() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
+  const { data: meData } = useQuery({
+    queryKey: ["auth-me"],
+    queryFn: () => apiClient.get<any>("/auth/me").catch(() => null),
+  });
+
+  const currentUser = meData?.user;
+
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)) {
@@ -103,17 +110,31 @@ function AuthedLayout() {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    size="icon"
-                    className="h-8.5 w-8.5 rounded-full border border-border/80 bg-muted/50 hover:bg-muted"
+                    size="sm"
+                    className="flex items-center gap-2 h-8.5 px-2 rounded-full border border-border/80 bg-muted/50 hover:bg-muted"
                   >
-                    <UserCircle className="h-5 w-5 text-foreground" />
+                    {currentUser?.avatar_url ? (
+                      <img src={currentUser.avatar_url} alt="Avatar" className="h-6 w-6 rounded-full" />
+                    ) : (
+                      <UserCircle className="h-5 w-5 text-foreground" />
+                    )}
+                    <span className="hidden lg:inline text-xs font-medium text-foreground max-w-[130px] truncate">
+                      {currentUser?.full_name || "Account Profile"}
+                    </span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuLabel className="font-normal">
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel className="font-normal p-3">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-semibold leading-none text-foreground">User Session</p>
-                      <p className="text-xs leading-none text-muted-foreground">MOMENTUM Pyramid Account</p>
+                      <p className="text-sm font-bold leading-none text-foreground">
+                        {currentUser?.full_name || "Authenticated User"}
+                      </p>
+                      <p className="text-xs leading-none text-primary font-medium mt-0.5">
+                        {currentUser?.designation || currentUser?.department || "MOMENTUM Pyramid"}
+                      </p>
+                      <p className="text-[11px] leading-none text-muted-foreground font-mono truncate mt-1">
+                        {currentUser?.email || currentUser?.official_email || "Active Session"}
+                      </p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />

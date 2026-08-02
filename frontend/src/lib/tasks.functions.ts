@@ -37,9 +37,20 @@ export interface Task {
 export interface Epic {
   id: string;
   title: string;
+  name?: string;
   description: string | null;
   status: string;
   color?: string;
+  start_date?: string | null;
+  target_date?: string | null;
+  estimated_hours?: number;
+  total_investment?: number;
+  budget_breakdown?: any;
+  estimated_profit?: number;
+  profit_percentage?: number;
+  total_points?: number;
+  velocity_per_sprint?: number;
+  calculated_sprints?: number;
   created_at: string;
 }
 
@@ -96,9 +107,20 @@ export type TaskInput = z.input<typeof taskInput>;
 export type TaskUpdateInput = Partial<TaskInput> & { id: string };
 export type EpicInput = {
   title: string;
+  name?: string;
   description?: string | null;
-  status?: "planning" | "in_progress" | "completed";
+  status?: string;
   color?: string;
+  start_date?: string | null;
+  target_date?: string | null;
+  estimated_hours?: number;
+  total_investment?: number;
+  budget_breakdown?: any;
+  estimated_profit?: number;
+  profit_percentage?: number;
+  total_points?: number;
+  velocity_per_sprint?: number;
+  calculated_sprints?: number;
 };
 export type SprintInput = {
   name: string;

@@ -15,8 +15,19 @@ export interface Sprint {
 export interface Epic {
   id: string;
   title: string;
+  name?: string;
   description: string | null;
-  status: "open" | "in_progress" | "completed";
+  status: "open" | "in_progress" | "completed" | "planned";
+  start_date?: string | null;
+  target_date?: string | null;
+  estimated_hours?: number;
+  total_investment?: number;
+  budget_breakdown?: any;
+  estimated_profit?: number;
+  profit_percentage?: number;
+  total_points?: number;
+  velocity_per_sprint?: number;
+  calculated_sprints?: number;
   created_at?: string;
 }
 
@@ -241,19 +252,47 @@ export class TaskModel {
     const [rows] = await pool.query<RowDataPacket[]>(
       "SELECT * FROM epics ORDER BY created_at DESC",
     );
-    return rows as Epic[];
+    return rows.map((r) => ({
+      ...r,
+      title: r.title || r.name || "Untitled Epic",
+      budget_breakdown: typeof r.budget_breakdown === "string" ? JSON.parse(r.budget_breakdown) : r.budget_breakdown || [],
+    })) as Epic[];
   }
 
-  static async createEpic(data: Omit<Epic, "id" | "created_at">): Promise<Epic> {
+  static async createEpic(data: Partial<Epic>): Promise<Epic> {
     const id = crypto.randomUUID();
-    await pool.query("INSERT INTO epics (id, title, description, status) VALUES (?, ?, ?, ?)", [
-      id,
-      data.title,
-      data.description || null,
-      data.status || "open",
-    ]);
+    const title = data.title || data.name || "Untitled Epic";
+    await pool.query(
+      `INSERT INTO epics (
+        id, title, name, description, status, start_date, target_date,
+        estimated_hours, total_investment, budget_breakdown,
+        estimated_profit, profit_percentage, total_points, velocity_per_sprint, calculated_sprints
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        title,
+        title,
+        data.description || null,
+        data.status || "open",
+        data.start_date || null,
+        data.target_date || null,
+        data.estimated_hours || 0,
+        data.total_investment || 0,
+        data.budget_breakdown ? JSON.stringify(data.budget_breakdown) : null,
+        data.estimated_profit || 0,
+        data.profit_percentage || 0,
+        data.total_points || 0,
+        data.velocity_per_sprint || 20,
+        data.calculated_sprints || 1,
+      ],
+    );
     const [rows] = await pool.query<RowDataPacket[]>("SELECT * FROM epics WHERE id = ?", [id]);
-    return rows[0] as Epic;
+    const r = rows[0];
+    return {
+      ...r,
+      title: r?.title || r?.name || "Untitled Epic",
+      budget_breakdown: typeof r?.budget_breakdown === "string" ? JSON.parse(r.budget_breakdown) : r?.budget_breakdown || [],
+    } as Epic;
   }
 
   static async findAllStories(): Promise<Story[]> {

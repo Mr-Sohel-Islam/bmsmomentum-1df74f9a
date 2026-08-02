@@ -1319,6 +1319,19 @@ export async function initDb() {
     await addColumnIfNotExist(connection, "user_positions", "description", "TEXT");
     await addColumnIfNotExist(connection, "user_positions", "parent_position_id", "VARCHAR(36)");
 
+    // Ensure epics columns exist
+    await addColumnIfNotExist(connection, "epics", "title", "VARCHAR(255)");
+    await addColumnIfNotExist(connection, "epics", "start_date", "DATE");
+    await addColumnIfNotExist(connection, "epics", "target_date", "DATE");
+    await addColumnIfNotExist(connection, "epics", "estimated_hours", "INT DEFAULT 0");
+    await addColumnIfNotExist(connection, "epics", "total_investment", "DECIMAL(14,2) DEFAULT 0.00");
+    await addColumnIfNotExist(connection, "epics", "budget_breakdown", "JSON");
+    await addColumnIfNotExist(connection, "epics", "estimated_profit", "DECIMAL(14,2) DEFAULT 0.00");
+    await addColumnIfNotExist(connection, "epics", "profit_percentage", "DECIMAL(7,2) DEFAULT 0.00");
+    await addColumnIfNotExist(connection, "epics", "total_points", "INT DEFAULT 0");
+    await addColumnIfNotExist(connection, "epics", "velocity_per_sprint", "INT DEFAULT 20");
+    await addColumnIfNotExist(connection, "epics", "calculated_sprints", "INT DEFAULT 1");
+
     // Check if profiles exist. If database is fresh, run full seed.
     const [existingProfiles] = await connection.query<mysql.RowDataPacket[]>(
       "SELECT COUNT(*) as count FROM profiles",

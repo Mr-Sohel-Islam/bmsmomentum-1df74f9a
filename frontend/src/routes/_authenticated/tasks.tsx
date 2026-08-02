@@ -183,7 +183,7 @@ function TasksPage() {
   const stories: Story[] = storiesData;
 
   const epicMut = useMutation({
-    mutationFn: (v: EpicInput) => createEpicFn({ data: v }),
+    mutationFn: (v: EpicInput) => apiClient.post<Epic>("/epics", v),
     onSuccess: () => {
       toast.success("Epic created");
       setEpicDialogOpen(false);
@@ -192,7 +192,7 @@ function TasksPage() {
     onError: (e: { message?: string }) => toast.error(e?.message ?? "Failed to create epic"),
   });
   const sprintMut = useMutation({
-    mutationFn: (v: SprintInput) => createSprintFn({ data: v }),
+    mutationFn: (v: SprintInput) => apiClient.post<Sprint>("/sprints", v),
     onSuccess: () => {
       toast.success("Sprint created");
       setSprintDialogOpen(false);
@@ -201,7 +201,7 @@ function TasksPage() {
     onError: (e: { message?: string }) => toast.error(e?.message ?? "Failed to create sprint"),
   });
   const storyMut = useMutation({
-    mutationFn: (v: StoryInput) => createStoryFn({ data: v }),
+    mutationFn: (v: StoryInput) => apiClient.post<Story>("/stories", v),
     onSuccess: () => {
       toast.success("Story created");
       setStoryDialogOpen(false);
@@ -227,7 +227,7 @@ function TasksPage() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ["tasks"] });
 
   const createMut = useMutation({
-    mutationFn: (v: TaskInput) => create({ data: v }),
+    mutationFn: (v: TaskInput) => apiClient.post<Task>("/tasks", v),
     onSuccess: () => {
       toast.success("Task created");
       setTaskDialogOpen(false);
@@ -237,13 +237,13 @@ function TasksPage() {
   });
 
   const updateMut = useMutation({
-    mutationFn: (v: TaskUpdateInput) => update({ data: v }),
+    mutationFn: (v: TaskUpdateInput) => apiClient.put<Task>(`/tasks/${v.id}`, v),
     onSuccess: () => invalidate(),
     onError: (e: { message?: string }) => toast.error(e?.message ?? "Failed to update task"),
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: string) => remove({ data: { id } }),
+    mutationFn: (id: string) => apiClient.delete(`/tasks/${id}`),
     onSuccess: () => {
       toast.success("Task deleted");
       setActiveTaskDetail(null);
@@ -254,7 +254,7 @@ function TasksPage() {
 
   const bulkAssignMut = useMutation({
     mutationFn: (v: { ids: string[]; assignee_id?: string | null; team_id?: string | null }) =>
-      bulkAssignFn({ data: v }),
+      apiClient.post("/tasks/bulk-assign", v),
     onSuccess: (_, vars) => {
       toast.success(`Successfully assigned ${vars.ids.length} task(s)!`);
       setSelectedTaskIds([]);
@@ -264,7 +264,8 @@ function TasksPage() {
   });
 
   const bulkStatusMut = useMutation({
-    mutationFn: (v: { ids: string[]; status: TaskStatus }) => bulkStatusFn({ data: v }),
+    mutationFn: (v: { ids: string[]; status: TaskStatus }) =>
+      apiClient.post("/tasks/bulk-status", v),
     onSuccess: (_, vars) => {
       toast.success(`Updated status for ${vars.ids.length} task(s)!`);
       setSelectedTaskIds([]);
@@ -274,7 +275,7 @@ function TasksPage() {
   });
 
   const bulkDeleteMut = useMutation({
-    mutationFn: (v: { ids: string[] }) => bulkDeleteFn({ data: v }),
+    mutationFn: (v: { ids: string[] }) => apiClient.post("/tasks/bulk-delete", v),
     onSuccess: (_, vars) => {
       toast.success(`Deleted ${vars.ids.length} task(s)!`);
       setSelectedTaskIds([]);
@@ -1052,7 +1053,7 @@ function HierarchyTreeView({
   );
 }
 
-// Epics Manager
+// Epics Manager with Financial Streams, Timetable, and Sprint Capacity Plan
 function EpicsManager({
   epics,
   tasks,
@@ -1063,32 +1064,89 @@ function EpicsManager({
   stories: Story[];
 }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-6 md:grid-cols-2">
       {epics.map((epic) => {
         const linkedTasks = tasks.filter((t) => t.epic_id === epic.id);
         const doneCount = linkedTasks.filter((t) => t.status === "done").length;
         const pct = linkedTasks.length > 0 ? Math.round((doneCount / linkedTasks.length) * 100) : 0;
 
+        const investment = epic.total_investment || 0;
+        const profit = epic.estimated_profit || 0;
+        const roiPct = epic.profit_percentage || 0;
+        const totalReturn = investment + profit;
+
         return (
-          <div key={epic.id} className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div key={epic.id} className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-sm hover:shadow-md transition-all">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <span className="font-mono text-[10px] uppercase tracking-widest text-emerald-400">
-                  Epic
-                </span>
-                <h3 className="text-lg font-bold text-foreground">{epic.title}</h3>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                    Epic Strategy
+                  </Badge>
+                  {epic.calculated_sprints && (
+                    <Badge variant="outline" className="font-mono text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/30">
+                      {epic.calculated_sprints} Sprints Planned
+                    </Badge>
+                  )}
+                </div>
+                <h3 className="text-lg font-bold text-foreground mt-1">{epic.title}</h3>
               </div>
-              <Badge variant="outline" className="capitalize">
+              <Badge variant="outline" className="capitalize text-xs">
                 {epic.status}
               </Badge>
             </div>
 
-            <p className="text-xs text-muted-foreground">{epic.description || "No description."}</p>
+            <p className="text-xs text-muted-foreground line-clamp-2">{epic.description || "No description provided."}</p>
+
+            {/* Timetable Badge Bar */}
+            {(epic.start_date || epic.target_date || epic.estimated_hours) && (
+              <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground font-mono bg-muted/30 p-2.5 rounded-lg border border-border/50">
+                {epic.start_date && (
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3 text-primary" /> {epic.start_date}
+                  </span>
+                )}
+                {epic.target_date && (
+                  <span className="flex items-center gap-1">
+                    ➔ {epic.target_date}
+                  </span>
+                )}
+                {epic.estimated_hours ? (
+                  <span className="flex items-center gap-1 text-amber-400 font-bold ml-auto">
+                    <Clock className="h-3 w-3" /> {epic.estimated_hours} hrs
+                  </span>
+                ) : null}
+              </div>
+            )}
+
+            {/* Financial Money Flow Stream */}
+            {investment > 0 && (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] font-mono text-emerald-400 font-bold uppercase tracking-wider">
+                  <span>💳 Capital & Money Flow Stream</span>
+                  <span>ROI: +{roiPct}%</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">INVESTMENT</span>
+                    <span className="font-bold text-foreground">₹{investment.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">ESTIMATED PROFIT</span>
+                    <span className="font-bold text-emerald-400">+₹{profit.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">PROJECTED RETURN</span>
+                    <span className="font-bold text-primary">₹{totalReturn.toLocaleString("en-IN")}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Progress bar */}
             <div className="space-y-1">
               <div className="flex justify-between text-xs font-mono text-muted-foreground">
-                <span>Completion</span>
+                <span>Task Execution Progress</span>
                 <span>
                   {pct}% ({doneCount}/{linkedTasks.length} tasks)
                 </span>
@@ -1520,7 +1578,7 @@ function TaskModal({
   );
 }
 
-// Epic Modal
+// Epic Modal with Timetable, Dynamic Budget & Investment Breakdown, Dual-Way Profit Calculator, Sprint Capacity Plan, and Money Flow Stream
 function CreateEpicModal({
   open,
   setOpen,
@@ -1532,11 +1590,86 @@ function CreateEpicModal({
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [targetDate, setTargetDate] = useState(
+    new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10),
+  );
+  const [estimatedHours, setEstimatedHours] = useState(240);
+
+  // Dynamic Investment Key-Value Items
+  const [investments, setInvestments] = useState<Array<{ id: string; category: string; amount: number }>>([
+    { id: "inv-1", category: "R&D & Clinical Formulation", amount: 150000 },
+    { id: "inv-2", category: "Marketing & Territory Launch", amount: 75000 },
+  ]);
+
+  // Real-time Sum for Total Capital Investment
+  const totalInvestment = useMemo(
+    () => investments.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
+    [investments],
+  );
+
+  // Financial Metrics: Profit & Percentage Calculator
+  const [estimatedProfit, setEstimatedProfit] = useState(45000);
+  const [profitPercentage, setProfitPercentage] = useState(20);
+
+  // Handle Profit ₹ Change
+  const handleProfitChange = (val: number) => {
+    setEstimatedProfit(val);
+    if (totalInvestment > 0) {
+      setProfitPercentage(Number(((val / totalInvestment) * 100).toFixed(1)));
+    }
+  };
+
+  // Handle Profit % Change
+  const handlePercentageChange = (val: number) => {
+    setProfitPercentage(val);
+    setEstimatedProfit(Math.round(totalInvestment * (val / 100)));
+  };
+
+  // Sprint & Velocity Capacity Calculator
+  const [totalPoints, setTotalPoints] = useState(80);
+  const [velocityPerSprint, setVelocityPerSprint] = useState(20);
+
+  const calculatedSprints = Math.max(1, Math.ceil(totalPoints / (velocityPerSprint || 20)));
+  const pointsPerSprint = Math.round(totalPoints / calculatedSprints);
+  const hoursPerSprint = Math.round(estimatedHours / calculatedSprints);
+  const projectedRevenue = totalInvestment + estimatedProfit;
+
+  const addInvestmentItem = () => {
+    setInvestments((prev) => [
+      ...prev,
+      { id: `inv-${Date.now()}`, category: "Operations & Equipment", amount: 25000 },
+    ]);
+  };
+
+  const removeInvestmentItem = (id: string) => {
+    setInvestments((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  const updateInvestmentItem = (id: string, key: "category" | "amount", val: any) => {
+    setInvestments((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [key]: val } : item)),
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onAdd({ title, description: description || null, status: "in_progress" });
+    onAdd({
+      title,
+      description: description || null,
+      status: "in_progress",
+      start_date: startDate || null,
+      target_date: targetDate || null,
+      estimated_hours: Number(estimatedHours) || 0,
+      total_investment: totalInvestment,
+      budget_breakdown: investments,
+      estimated_profit: estimatedProfit,
+      profit_percentage: profitPercentage,
+      total_points: totalPoints,
+      velocity_per_sprint: velocityPerSprint,
+      calculated_sprints: calculatedSprints,
+    });
     setTitle("");
     setDescription("");
     setOpen(false);
@@ -1544,21 +1677,246 @@ function CreateEpicModal({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Epic</DialogTitle>
+          <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+            <Layers className="h-6 w-6 text-emerald-400" /> Create Epic Strategy & Financial Architecture
+          </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Epic Title</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
+
+        <form onSubmit={handleSubmit} className="space-y-6 py-2">
+          {/* Section 1: Basic Info */}
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                Epic Title *
+              </Label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                placeholder="e.g. Oncology Portfolio 2026 Formulation & Market Launch"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                Description & Strategic Objectives
+              </Label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe project scope, clinical targets, and expected outcomes..."
+              />
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>Description</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+
+          {/* Section 2: Timetable / Schedule */}
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-4 space-y-3">
+            <h4 className="font-bold text-xs uppercase tracking-widest text-primary flex items-center gap-1.5">
+              <Calendar className="h-4 w-4" /> Timetable & Hours Schedule
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Start Date</Label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Target End Date</Label>
+                <Input
+                  type="date"
+                  value={targetDate}
+                  onChange={(e) => setTargetDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Estimated Total Hours</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={estimatedHours}
+                  onChange={(e) => setEstimatedHours(Number(e.target.value))}
+                />
+              </div>
+            </div>
           </div>
+
+          {/* Section 3: Dynamic Budget Investment Breakdown */}
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-xs uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
+                <DollarSign className="h-4 w-4" /> Dynamic Capital Investment Breakdown
+              </h4>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addInvestmentItem}
+                className="h-7 text-xs gap-1 text-emerald-400 border-emerald-500/40 bg-emerald-500/10"
+              >
+                <Plus className="h-3 w-3" /> Add Item
+              </Button>
+            </div>
+
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {investments.map((inv) => (
+                <div key={inv.id} className="flex items-center gap-2">
+                  <Input
+                    placeholder="Category (e.g. Clinical Trial)"
+                    value={inv.category}
+                    onChange={(e) => updateInvestmentItem(inv.id, "category", e.target.value)}
+                    className="flex-1 text-xs"
+                  />
+                  <div className="relative w-36">
+                    <span className="absolute left-2.5 top-2 text-xs text-muted-foreground">₹</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={inv.amount}
+                      onChange={(e) => updateInvestmentItem(inv.id, "amount", Number(e.target.value))}
+                      className="pl-6 text-xs font-mono font-bold"
+                    />
+                  </div>
+                  {investments.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeInvestmentItem(inv.id)}
+                      className="h-8 w-8 text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between border-t border-border/50 pt-2 font-mono text-xs font-bold text-foreground">
+              <span>TOTAL CAPITAL INVESTMENT (Sum):</span>
+              <span className="text-emerald-400 text-sm">₹{totalInvestment.toLocaleString("en-IN")}</span>
+            </div>
+          </div>
+
+          {/* Section 4: Dual-Way Financial Profit & Margin Calculator */}
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-4 space-y-3">
+            <h4 className="font-bold text-xs uppercase tracking-widest text-amber-400 flex items-center gap-1.5">
+              <TrendingUp className="h-4 w-4" /> Financial Profit & ROI Percentage Calculator
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs">Estimated Profit (₹)</Label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-2 text-xs text-muted-foreground">₹</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={estimatedProfit}
+                    onChange={(e) => handleProfitChange(Number(e.target.value))}
+                    className="pl-6 font-mono text-xs font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Profit Percentage Margin (%)</Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={profitPercentage}
+                    onChange={(e) => handlePercentageChange(Number(e.target.value))}
+                    className="pr-6 font-mono text-xs font-bold text-emerald-400"
+                  />
+                  <span className="absolute right-2.5 top-2 text-xs text-muted-foreground">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 5: Sprint & Velocity Capacity Calculator */}
+          <div className="rounded-xl border border-border/80 bg-muted/20 p-4 space-y-3">
+            <h4 className="font-bold text-xs uppercase tracking-widest text-blue-400 flex items-center gap-1.5">
+              <Zap className="h-4 w-4" /> Sprint Capacity & Velocity Planning
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs">Total Story Points Required</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={totalPoints}
+                  onChange={(e) => setTotalPoints(Math.max(0, Number(e.target.value)))}
+                  className="font-mono text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Target Velocity (Points / Sprint)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={velocityPerSprint}
+                  onChange={(e) => setVelocityPerSprint(Math.max(1, Number(e.target.value)))}
+                  className="font-mono text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-card p-3 border border-border/60 grid grid-cols-3 gap-2 text-center text-xs font-mono">
+              <div>
+                <span className="text-muted-foreground block text-[10px]">TOTAL SPRINTS</span>
+                <span className="font-bold text-blue-400 text-base">{calculatedSprints} Sprints</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[10px]">POINTS / SPRINT</span>
+                <span className="font-bold text-purple-400 text-base">{pointsPerSprint} pts</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[10px]">HOURS / SPRINT</span>
+                <span className="font-bold text-amber-400 text-base">{hoursPerSprint} hrs</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 6: Interactive Money Flow & Investment Return Stream Card */}
+          <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 space-y-2">
+            <div className="flex items-center justify-between text-xs font-mono uppercase tracking-widest text-emerald-400 font-bold">
+              <span>💳 Executive Money Flow Stream</span>
+              <span>ROI: +{profitPercentage}%</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <span className="text-[10px] text-muted-foreground block">INVESTMENT</span>
+                <span className="text-xs font-bold text-foreground font-mono">
+                  ₹{totalInvestment.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-muted-foreground block">ESTIMATED PROFIT</span>
+                <span className="text-xs font-bold text-emerald-400 font-mono">
+                  +₹{estimatedProfit.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-muted-foreground block">TOTAL RETURN</span>
+                <span className="text-xs font-bold text-primary font-mono">
+                  ₹{projectedRevenue.toLocaleString("en-IN")}
+                </span>
+              </div>
+            </div>
+          </div>
+
           <DialogFooter>
-            <Button type="submit">Create Epic</Button>
+            <Button type="submit" className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500">
+              Create Epic Strategy
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

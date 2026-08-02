@@ -138,14 +138,40 @@ export class TaskController {
   }
 
   static async createEpic(req: Request, res: Response) {
-    const { title, description, status } = req.body;
-    if (!title) {
+    const {
+      title,
+      name,
+      description,
+      status,
+      start_date,
+      target_date,
+      estimated_hours,
+      total_investment,
+      budget_breakdown,
+      estimated_profit,
+      profit_percentage,
+      total_points,
+      velocity_per_sprint,
+      calculated_sprints,
+    } = req.body;
+    const epicTitle = title || name;
+    if (!epicTitle) {
       throw new AppError("Epic title is required", 400);
     }
     const epic = await TaskModel.createEpic({
-      title,
+      title: epicTitle,
       description: description || null,
       status: status || "open",
+      start_date: start_date || null,
+      target_date: target_date || null,
+      estimated_hours: Number(estimated_hours) || 0,
+      total_investment: Number(total_investment) || 0,
+      budget_breakdown: budget_breakdown || [],
+      estimated_profit: Number(estimated_profit) || 0,
+      profit_percentage: Number(profit_percentage) || 0,
+      total_points: Math.max(0, Number(total_points) || 0),
+      velocity_per_sprint: Math.max(1, Number(velocity_per_sprint) || 20),
+      calculated_sprints: Math.max(1, Number(calculated_sprints) || 1),
     });
     return sendSuccess(res, epic, "Epic created", 201);
   }
