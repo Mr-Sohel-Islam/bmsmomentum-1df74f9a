@@ -40,16 +40,12 @@ import { useMyAccess } from "@/hooks/use-my-access";
 
 const main = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, permissions: [] },
-  { title: "Doctors Management", url: "/doctors", icon: Stethoscope, permissions: ["pharma:read"] },
-  { title: "Trade & Chemists", url: "/trade", icon: Store, permissions: ["trade:read"] },
   { title: "Workstation Activity", url: "/workstation", icon: Briefcase, permissions: ["reports:read"] },
-  { title: "3D Product Detailing", url: "/detailing", icon: Sparkles, permissions: ["detailing:read"] },
   { title: "Products", url: "/products", icon: Package, permissions: ["products:read"] },
+  { title: "Tasks & Backlog", url: "/tasks", icon: CheckSquare, permissions: ["tasks:read"] },
   { title: "My Performance", url: "/performance", icon: TrendingUp, permissions: ["performance:read"] },
-  { title: "Tasks", url: "/tasks", icon: CheckSquare, permissions: ["tasks:read"] },
   { title: "Appreciation", url: "/appreciation", icon: MessageSquareHeart, permissions: ["performance:read"] },
   { title: "Approvals", url: "/approvals", icon: Inbox, permissions: ["approvals:read"] },
-  { title: "Account", url: "/account", icon: UserCircle, permissions: [] },
 ];
 
 const admin = [

@@ -1,13 +1,23 @@
 import { useState, useEffect } from "react";
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { Search } from "lucide-react";
-import { getAuthToken } from "@/lib/api-client";
+import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/react-router";
+import { Search, Sparkles, UserCircle, LogOut, User } from "lucide-react";
+import { getAuthToken, setAuthToken } from "@/lib/api-client";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
 import { CommandPalette } from "@/components/command-palette";
 import { NotificationCenter } from "@/components/notification-center";
 import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -21,6 +31,8 @@ export const Route = createFileRoute("/_authenticated")({
 
 function AuthedLayout() {
   const [openCommandPalette, setOpenCommandPalette] = useState(false);
+  const navigate = useNavigate();
+  const qc = useQueryClient();
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -33,6 +45,14 @@ function AuthedLayout() {
     return () => document.removeEventListener("keydown", down);
   }, []);
 
+  async function handleSignOut() {
+    await qc.cancelQueries();
+    qc.clear();
+    setAuthToken(null);
+    toast.success("Signed out");
+    navigate({ to: "/auth", replace: true });
+  }
+
   return (
     <SidebarProvider defaultOpen={false}>
       <div className="flex min-h-screen w-full">
@@ -42,11 +62,23 @@ function AuthedLayout() {
             <div className="flex items-center gap-3">
               <SidebarTrigger />
               <div className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                MOMENTUM · Admin
+                MOMENTUM · Field Operations
               </div>
             </div>
 
             <div className="flex items-center gap-2">
+              {/* 3D Product Detailing Shortcut Button in Top Bar */}
+              <Link to="/detailing">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-1.5 h-8.5 px-3 text-xs font-semibold text-purple-400 hover:text-purple-300 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 shadow-xs transition-all"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline">3D Detailing</span>
+                </Button>
+              </Link>
+
               <Button
                 variant="outline"
                 size="sm"
@@ -65,6 +97,42 @@ function AuthedLayout() {
 
               {/* Real-time Notification Center Bell & Sidebar */}
               <NotificationCenter />
+
+              {/* Account Section & Logout Dropdown Menu in Top Bar */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8.5 w-8.5 rounded-full border border-border/80 bg-muted/50 hover:bg-muted"
+                  >
+                    <UserCircle className="h-5 w-5 text-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-semibold leading-none text-foreground">User Session</p>
+                      <p className="text-xs leading-none text-muted-foreground">MOMENTUM Pyramid Account</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild className="cursor-pointer">
+                    <Link to="/account" className="flex items-center gap-2 w-full">
+                      <User className="h-4 w-4 text-primary" />
+                      <span>My Account Profile</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive flex items-center gap-2"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Sign Out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </header>
           <main className="flex-1">
