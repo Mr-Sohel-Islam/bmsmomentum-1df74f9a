@@ -48,7 +48,7 @@ function PositionsPage() {
   const qc = useQueryClient();
   const create = useServerFn(createPosition);
   const remove = useServerFn(deletePosition);
-  const { data, isLoading } = useQuery({
+  const { data: positions = [], isLoading } = useQuery({
     queryKey: ["positions"],
     queryFn: () => apiClient.get<Position[]>("/positions"),
   });
