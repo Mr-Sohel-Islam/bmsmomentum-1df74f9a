@@ -239,8 +239,8 @@ async function seedCompleteApplicationFlows(connection: mysql.PoolConnection) {
 
   for (const pos of positions) {
     await connection.query(
-      "INSERT INTO user_positions (id, title, department) VALUES (?, ?, ?)",
-      [pos.id, pos.title, pos.department]
+      "INSERT INTO user_positions (id, title, department, level) VALUES (?, ?, ?, ?)",
+      [pos.id, pos.title, pos.department, pos.level]
     );
   }
 
@@ -1313,6 +1313,11 @@ export async function initDb() {
     await addColumnIfNotExist(connection, "profiles", "email", "VARCHAR(255)");
     await addColumnIfNotExist(connection, "profiles", "password_hash", "VARCHAR(255)");
     await addColumnIfNotExist(connection, "profiles", "must_change_password", "TINYINT(1) DEFAULT 0");
+
+    // Ensure user_positions columns exist
+    await addColumnIfNotExist(connection, "user_positions", "level", "INT DEFAULT 0");
+    await addColumnIfNotExist(connection, "user_positions", "description", "TEXT");
+    await addColumnIfNotExist(connection, "user_positions", "parent_position_id", "VARCHAR(36)");
 
     // Check if profiles exist. If database is fresh, run full seed.
     const [existingProfiles] = await connection.query<mysql.RowDataPacket[]>(

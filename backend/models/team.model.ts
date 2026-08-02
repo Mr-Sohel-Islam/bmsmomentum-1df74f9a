@@ -26,6 +26,8 @@ export interface Position {
   title: string;
   department: string | null;
   description: string | null;
+  level?: number;
+  parent_position_id?: string | null;
   created_at?: string;
 }
 
@@ -147,7 +149,7 @@ export class TeamModel {
   }
 
   static async findAllPositions(): Promise<Position[]> {
-    const [rows] = await pool.query<RowDataPacket[]>("SELECT * FROM positions ORDER BY title ASC");
+    const [rows] = await pool.query<RowDataPacket[]>("SELECT * FROM user_positions ORDER BY level ASC, title ASC");
     return rows as Position[];
   }
 
@@ -155,19 +157,21 @@ export class TeamModel {
     title: string,
     department: string | null,
     description: string | null,
+    level: number = 0,
+    parentPositionId: string | null = null,
   ): Promise<Position> {
     const id = crypto.randomUUID();
     await pool.query(
-      "INSERT INTO positions (id, title, department, description) VALUES (?, ?, ?, ?)",
-      [id, title, department, description],
+      "INSERT INTO user_positions (id, title, department, description, level, parent_position_id) VALUES (?, ?, ?, ?, ?, ?)",
+      [id, title, department, description, level, parentPositionId],
     );
-    const [rows] = await pool.query<RowDataPacket[]>("SELECT * FROM positions WHERE id = ?", [id]);
+    const [rows] = await pool.query<RowDataPacket[]>("SELECT * FROM user_positions WHERE id = ?", [id]);
     return rows[0] as Position;
   }
 
   static async updatePosition(
     id: string,
-    updates: { title?: string; department?: string | null; description?: string | null },
+    updates: { title?: string; department?: string | null; description?: string | null; level?: number; parent_position_id?: string | null },
   ): Promise<Position | null> {
     const fields: string[] = [];
     const values: unknown[] = [];
@@ -183,18 +187,26 @@ export class TeamModel {
       fields.push("description = ?");
       values.push(updates.description);
     }
+    if (updates.level !== undefined) {
+      fields.push("level = ?");
+      values.push(updates.level);
+    }
+    if (updates.parent_position_id !== undefined) {
+      fields.push("parent_position_id = ?");
+      values.push(updates.parent_position_id);
+    }
 
     if (fields.length > 0) {
       values.push(id);
-      await pool.query(`UPDATE positions SET ${fields.join(", ")} WHERE id = ?`, values);
+      await pool.query(`UPDATE user_positions SET ${fields.join(", ")} WHERE id = ?`, values);
     }
 
-    const [rows] = await pool.query<RowDataPacket[]>("SELECT * FROM positions WHERE id = ?", [id]);
+    const [rows] = await pool.query<RowDataPacket[]>("SELECT * FROM user_positions WHERE id = ?", [id]);
     return (rows[0] as Position) || null;
   }
 
   static async deletePosition(id: string): Promise<boolean> {
-    const [res] = await pool.query<ResultSetHeader>("DELETE FROM positions WHERE id = ?", [id]);
+    const [res] = await pool.query<ResultSetHeader>("DELETE FROM user_positions WHERE id = ?", [id]);
     return res.affectedRows > 0;
   }
 }
