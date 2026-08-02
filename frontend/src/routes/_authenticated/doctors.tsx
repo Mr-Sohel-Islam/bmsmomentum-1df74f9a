@@ -20,6 +20,8 @@ import { listDoctors, createDoctor, updateDoctor, DoctorRecord } from "@/lib/pha
 import { useMyAccess } from "@/hooks/use-my-access";
 import { apiClient } from "@/lib/api-client";
 
+import { SpecialDayReminders } from "@/components/special-day-reminders";
+
 export const Route = createFileRoute("/_authenticated/doctors")({
   head: () => ({
     meta: [
@@ -236,6 +238,9 @@ function DoctorsPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* 7-Day Dedicated Special Day Reminders & Countdown Engine */}
+      <SpecialDayReminders />
 
       {/* Filter / Search Bar */}
       <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">

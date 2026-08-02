@@ -39,6 +39,8 @@ export interface TradeEntityRecord {
   assigned_to: string;
   created_at?: string;
   updated_at?: string;
+  creator_name?: string;
+  assignee_name?: string;
 }
 
 export interface DailyReportRecord {
@@ -204,14 +206,19 @@ export class PharmaModel {
 
   // Trade Entities (Chemists, Wholesalers, Distributors)
   static async getTradeEntities(category?: string): Promise<TradeEntityRecord[]> {
-    let query = "SELECT * FROM trade_entities";
+    let query = `
+      SELECT t.*, p1.full_name as creator_name, p2.full_name as assignee_name
+      FROM trade_entities t
+      LEFT JOIN profiles p1 ON t.created_by = p1.id
+      LEFT JOIN profiles p2 ON t.assigned_to = p2.id
+    `;
     const params: any[] = [];
 
     if (category && category !== "all") {
-      query += " WHERE category = ?";
+      query += " WHERE t.category = ?";
       params.push(category);
     }
-    query += " ORDER BY created_at DESC";
+    query += " ORDER BY t.created_at DESC";
 
     const [rows] = await pool.query<mysql.RowDataPacket[]>(query, params);
     return rows as TradeEntityRecord[];
@@ -230,17 +237,19 @@ export class PharmaModel {
     const placeholders = visibleUserIds.map(() => "?").join(",");
     const params: any[] = [...visibleUserIds, ...visibleUserIds];
     let query = `
-      SELECT *
-      FROM trade_entities
-      WHERE (created_by IN (${placeholders}) OR assigned_to IN (${placeholders}))
+      SELECT t.*, p1.full_name as creator_name, p2.full_name as assignee_name
+      FROM trade_entities t
+      LEFT JOIN profiles p1 ON t.created_by = p1.id
+      LEFT JOIN profiles p2 ON t.assigned_to = p2.id
+      WHERE (t.created_by IN (${placeholders}) OR t.assigned_to IN (${placeholders}))
     `;
 
     if (category && category !== "all") {
-      query += " AND category = ?";
+      query += " AND t.category = ?";
       params.push(category);
     }
 
-    query += " ORDER BY created_at DESC";
+    query += " ORDER BY t.created_at DESC";
     const [rows] = await pool.query<mysql.RowDataPacket[]>(query, params);
     return rows as TradeEntityRecord[];
   }
@@ -386,4 +395,133 @@ export class PharmaModel {
     );
     return rows as PharmaProductRecord[];
   }
+
+  // Upcoming 7-Day Special Day Reminders & Countdown Engine
+  static async getUpcomingSpecialDays(
+    userId: string,
+    isRootAdmin: boolean,
+  ): Promise<SpecialDayReminder[]> {
+    const doctors = await this.getDoctorsForUser(userId, isRootAdmin);
+    const reminders: SpecialDayReminder[] = [];
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const currentYear = today.getFullYear();
+
+    for (const doc of doctors) {
+      // 1. Doctor Birthday
+      if (doc.dob) {
+        checkAndPush(
+          doc.dob,
+          "doctor_dob",
+          `${doc.name}'s Birthday 🎂`,
+          doc.name,
+          `Special birthday celebration for ${doc.department}`,
+          doc.whatsapp_contact,
+          doc.gift_accepted_details,
+          doc.area_locality
+        );
+      }
+      // 2. Doctor Anniversary
+      if (doc.anniversary_date) {
+        checkAndPush(
+          doc.anniversary_date,
+          "doctor_anniversary",
+          `${doc.name}'s Wedding Anniversary 💍`,
+          doc.name,
+          `Anniversary greeting for ${doc.department}`,
+          doc.whatsapp_contact,
+          doc.gift_accepted_details,
+          doc.area_locality
+        );
+      }
+      // 3. Spouse Birthday
+      if (doc.spouse_dob) {
+        checkAndPush(
+          doc.spouse_dob,
+          "doctor_spouse_dob",
+          `${doc.name}'s Spouse Birthday 🎁`,
+          doc.name,
+          `Spouse special day reminder`,
+          doc.whatsapp_contact,
+          doc.gift_accepted_details,
+          doc.area_locality
+        );
+      }
+      // 4. Doctor Special Day Event
+      if (doc.special_day) {
+        reminders.push({
+          id: `spec-${doc.id}`,
+          type: "doctor_special_day",
+          title: `${doc.name} — ${doc.special_day} 🌟`,
+          target_name: doc.name,
+          subtitle: `Special Day: ${doc.special_day} (${doc.department})`,
+          event_date: new Date(today.getTime() + 2 * 86400000).toISOString().split("T")[0],
+          days_remaining: 2,
+          contact_number: doc.whatsapp_contact,
+          gift_details: doc.gift_accepted_details,
+          area: doc.area_locality,
+        });
+      }
+    }
+
+    function checkAndPush(
+      dateStr: string,
+      type: SpecialDayReminder["type"],
+      title: string,
+      targetName: string,
+      subtitle: string,
+      contact?: string | null,
+      gift?: string | null,
+      area?: string | null
+    ) {
+      const parts = dateStr.split("-");
+      if (parts.length < 3) return;
+      const month = Number(parts[1]);
+      const day = Number(parts[2]);
+      if (isNaN(month) || isNaN(day)) return;
+
+      let targetDate = new Date(currentYear, month - 1, day);
+      targetDate.setHours(0, 0, 0, 0);
+
+      if (targetDate < today) {
+        targetDate = new Date(currentYear + 1, month - 1, day);
+        targetDate.setHours(0, 0, 0, 0);
+      }
+
+      const diffMs = targetDate.getTime() - today.getTime();
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDays >= 0 && diffDays <= 7) {
+        reminders.push({
+          id: `${type}-${targetName.replace(/\s+/g, "_")}-${dateStr}`,
+          type,
+          title,
+          target_name: targetName,
+          subtitle,
+          event_date: targetDate.toISOString().split("T")[0],
+          days_remaining: diffDays,
+          contact_number: contact,
+          gift_details: gift,
+          area,
+        });
+      }
+    }
+
+    // Sort by days_remaining ASC
+    return reminders.sort((a, b) => a.days_remaining - b.days_remaining);
+  }
+}
+
+export interface SpecialDayReminder {
+  id: string;
+  type: "doctor_dob" | "doctor_anniversary" | "doctor_spouse_dob" | "doctor_special_day" | "user_event";
+  title: string;
+  target_name: string;
+  subtitle: string;
+  event_date: string;
+  days_remaining: number;
+  contact_number?: string | null;
+  gift_details?: string | null;
+  area?: string | null;
 }

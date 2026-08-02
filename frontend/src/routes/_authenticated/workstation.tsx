@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { listDailyReports, createDailyReport, DailyReportRecord } from "@/lib/pharma.functions";
 import { apiClient } from "@/lib/api-client";
+import { SpecialDayReminders } from "@/components/special-day-reminders";
 
 export const Route = createFileRoute("/_authenticated/workstation")({
   head: () => ({
@@ -344,6 +345,9 @@ function WorkstationPage() {
           </div>
         </div>
       </div>
+
+      {/* 7-Day Dedicated Special Day Reminders & Countdown Engine */}
+      <SpecialDayReminders />
 
       {/* Aggregate Metrics Bar */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

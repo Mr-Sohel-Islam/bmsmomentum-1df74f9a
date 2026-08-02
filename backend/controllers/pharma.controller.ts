@@ -180,4 +180,11 @@ export class PharmaController {
     const products = await PharmaModel.getPharmaProducts();
     return sendSuccess(res, products, "3D Detailing products fetched successfully");
   }
+
+  // 7-Day Dedicated Special Day Reminders & Countdown
+  static async getSpecialDays(req: AuthRequest, res: Response) {
+    const userId = PharmaController.userId(req);
+    const reminders = await PharmaModel.getUpcomingSpecialDays(userId, PharmaController.isRootOperationalUser(req));
+    return sendSuccess(res, reminders, "Special day reminders fetched successfully");
+  }
 }

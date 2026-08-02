@@ -121,3 +121,20 @@ export const createDailyReport = createServerFn({ method: "POST" })
 export const listPharmaProducts = createServerFn({ method: "GET" }).handler(async () => {
   return apiClient.get<PharmaProductRecord[]>("/pharma/pharma-products");
 });
+
+export interface SpecialDayReminder {
+  id: string;
+  type: "doctor_dob" | "doctor_anniversary" | "doctor_spouse_dob" | "doctor_special_day" | "user_event";
+  title: string;
+  target_name: string;
+  subtitle: string;
+  event_date: string;
+  days_remaining: number;
+  contact_number?: string | null;
+  gift_details?: string | null;
+  area?: string | null;
+}
+
+export const listSpecialDays = createServerFn({ method: "GET" }).handler(async () => {
+  return apiClient.get<SpecialDayReminder[]>("/pharma/special-days");
+});

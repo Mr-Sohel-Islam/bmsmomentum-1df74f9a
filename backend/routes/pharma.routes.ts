@@ -33,4 +33,10 @@ router.get(
   asyncHandler(PharmaController.getPharmaProducts),
 );
 
+router.get(
+  "/special-days",
+  ...protect("pharma:read"),
+  asyncHandler(PharmaController.getSpecialDays),
+);
+
 export default router;
