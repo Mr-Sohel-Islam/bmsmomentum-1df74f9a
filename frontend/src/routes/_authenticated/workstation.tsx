@@ -18,6 +18,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { listDailyReports, createDailyReport, DailyReportRecord } from "@/lib/pharma.functions";
+import { apiClient } from "@/lib/api-client";
 
 export const Route = createFileRoute("/_authenticated/workstation")({
   head: () => ({
@@ -31,7 +32,6 @@ export const Route = createFileRoute("/_authenticated/workstation")({
 
 function WorkstationPage() {
   const qc = useQueryClient();
-  const fetchReports = useServerFn(listDailyReports);
   const addReport = useServerFn(createDailyReport);
 
   const [dateFrom, setDateFrom] = useState("");
@@ -52,7 +52,13 @@ function WorkstationPage() {
 
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ["daily-reports", dateFrom, dateTo],
-    queryFn: () => fetchReports({ data: { date_from: dateFrom || undefined, date_to: dateTo || undefined } }),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (dateFrom) params.append("date_from", dateFrom);
+      if (dateTo) params.append("date_to", dateTo);
+      const q = params.toString() ? `?${params.toString()}` : "";
+      return apiClient.get<DailyReportRecord[]>(`/pharma/daily-reports${q}`);
+    },
   });
 
   const createMut = useMutation({

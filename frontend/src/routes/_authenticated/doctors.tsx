@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { listDoctors, createDoctor, updateDoctor, DoctorRecord } from "@/lib/pharma.functions";
 import { useMyAccess } from "@/hooks/use-my-access";
+import { apiClient } from "@/lib/api-client";
 
 export const Route = createFileRoute("/_authenticated/doctors")({
   head: () => ({
@@ -31,14 +32,13 @@ export const Route = createFileRoute("/_authenticated/doctors")({
 
 function DoctorsPage() {
   const qc = useQueryClient();
-  const fetchDoctors = useServerFn(listDoctors);
   const addDoc = useServerFn(createDoctor);
   const editDoc = useServerFn(updateDoctor);
   const { isAdmin } = useMyAccess();
 
   const { data: doctors = [], isLoading } = useQuery({
     queryKey: ["doctors"],
-    queryFn: () => fetchDoctors(),
+    queryFn: () => apiClient.get<DoctorRecord[]>("/pharma/doctors"),
   });
 
   const [search, setSearch] = useState("");

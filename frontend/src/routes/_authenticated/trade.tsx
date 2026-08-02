@@ -19,6 +19,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { listTradeEntities, createTradeEntity, TradeEntityRecord } from "@/lib/pharma.functions";
+import { apiClient } from "@/lib/api-client";
 
 export const Route = createFileRoute("/_authenticated/trade")({
   head: () => ({
@@ -32,7 +33,6 @@ export const Route = createFileRoute("/_authenticated/trade")({
 
 function TradePage() {
   const qc = useQueryClient();
-  const fetchTrade = useServerFn(listTradeEntities);
   const addTrade = useServerFn(createTradeEntity);
 
   const [category, setCategory] = useState<string>("all");
@@ -55,7 +55,10 @@ function TradePage() {
 
   const { data: entities = [], isLoading } = useQuery({
     queryKey: ["trade-entities", category],
-    queryFn: () => fetchTrade({ data: { category } }),
+    queryFn: () => {
+      const q = category && category !== "all" ? `?category=${category}` : "";
+      return apiClient.get<TradeEntityRecord[]>(`/pharma/trade-entities${q}`);
+    },
   });
 
   const createMut = useMutation({

@@ -40,6 +40,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { listRequests, decideRequest } from "@/lib/approvals.functions";
+import { apiClient } from "@/lib/api-client";
 
 interface ApprovalRequest {
   id: string;
@@ -69,11 +70,10 @@ export const Route = createFileRoute("/_authenticated/approvals")({
 
 function ApprovalsPage() {
   const qc = useQueryClient();
-  const fetchRequests = useServerFn(listRequests);
   const decide = useServerFn(decideRequest);
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["approval-requests"],
-    queryFn: () => fetchRequests(),
+    queryFn: () => apiClient.get<ApprovalRequest[]>("/approvals/requests"),
   });
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [selectedRequestDrawer, setSelectedRequestDrawer] = useState<ApprovalRequest | null>(null);

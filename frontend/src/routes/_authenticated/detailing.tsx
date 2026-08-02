@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { listPharmaProducts, PharmaProductRecord } from "@/lib/pharma.functions";
+import { apiClient } from "@/lib/api-client";
 
 export const Route = createFileRoute("/_authenticated/detailing")({
   head: () => ({
@@ -24,10 +25,9 @@ export const Route = createFileRoute("/_authenticated/detailing")({
 });
 
 function DetailingPage() {
-  const fetchProducts = useServerFn(listPharmaProducts);
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["pharma-products"],
-    queryFn: () => fetchProducts(),
+    queryFn: () => apiClient.get<PharmaProductRecord[]>("/pharma/pharma-products"),
   });
 
   const [activeProduct, setActiveProduct] = useState<PharmaProductRecord | null>(null);

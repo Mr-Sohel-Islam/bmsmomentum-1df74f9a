@@ -45,7 +45,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  listTasks,
   createTask,
   updateTask,
   deleteTask,
@@ -157,25 +156,25 @@ function TasksPage() {
 
   const { data: tasks = [], isLoading: tasksLoading } = useQuery({
     queryKey: ["tasks"],
-    queryFn: () => fetchTasks(),
+    queryFn: () => apiClient.get<any[]>("/tasks"),
   });
   const { data: usersData = [] } = useQuery({
     queryKey: ["assignables"],
-    queryFn: () => fetchUsers(),
+    queryFn: () => apiClient.get<UserOption[]>("/profiles"),
   });
   const users: UserOption[] = useMemo(
     () => usersData.map((u) => ({ id: u.id, full_name: u.full_name })),
     [usersData],
   );
-  const { data: teams = [] } = useQuery({ queryKey: ["teams"], queryFn: () => fetchTeams() });
-  const { data: epicsData = [] } = useQuery({ queryKey: ["epics"], queryFn: () => fetchEpics() });
+  const { data: teams = [] } = useQuery({ queryKey: ["teams"], queryFn: () => apiClient.get<any[]>("/teams") });
+  const { data: epicsData = [] } = useQuery({ queryKey: ["epics"], queryFn: () => apiClient.get<any[]>("/epics") });
   const { data: sprintsData = [] } = useQuery({
     queryKey: ["sprints"],
-    queryFn: () => fetchSprints(),
+    queryFn: () => apiClient.get<any[]>("/sprints"),
   });
   const { data: storiesData = [] } = useQuery({
     queryKey: ["stories"],
-    queryFn: () => fetchStories(),
+    queryFn: () => apiClient.get<any[]>("/stories"),
   });
 
   const epics: Epic[] = epicsData;
