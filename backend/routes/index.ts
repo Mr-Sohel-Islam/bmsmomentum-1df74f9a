@@ -8,6 +8,7 @@ import approvalRoutes from "./approval.routes.js";
 import appreciationRoutes from "./appreciation.routes.js";
 import productRoutes from "./product.routes.js";
 import pharmaRoutes from "./pharma.routes.js";
+import offersRoutes from "./offers.routes.js";
 
 const apiRouter = Router();
 
@@ -20,6 +21,7 @@ apiRouter.use("/approval", approvalRoutes);
 apiRouter.use("/approvals", approvalRoutes);
 apiRouter.use("/", appreciationRoutes);
 apiRouter.use("/products", productRoutes);
+apiRouter.use("/", offersRoutes);
 apiRouter.use("/pharma", pharmaRoutes);
 
 export default apiRouter;
