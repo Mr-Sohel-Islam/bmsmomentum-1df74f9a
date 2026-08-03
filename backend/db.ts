@@ -1297,6 +1297,64 @@ export async function initDb() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS offers (
+        id VARCHAR(64) PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        promo_code VARCHAR(64),
+        description TEXT,
+        details TEXT,
+        image_url TEXT,
+        offer_type VARCHAR(64) DEFAULT 'scheme',
+        value_details VARCHAR(255),
+        terms TEXT,
+        valid_from DATE,
+        valid_to DATE,
+        status VARCHAR(32) DEFAULT 'draft',
+        scheduled_at DATETIME,
+        email_subject VARCHAR(255),
+        email_body LONGTEXT,
+        created_by VARCHAR(36),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS offer_recipients (
+        id VARCHAR(64) PRIMARY KEY,
+        offer_id VARCHAR(64) NOT NULL,
+        recipient_type VARCHAR(32) NOT NULL DEFAULT 'employee',
+        recipient_id VARCHAR(64),
+        recipient_name VARCHAR(255),
+        recipient_email VARCHAR(255),
+        channel VARCHAR(32) NOT NULL DEFAULT 'both',
+        delivery_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+        error_message TEXT,
+        sent_at DATETIME,
+        created_by VARCHAR(36),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_offer_recipients_offer (offer_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id VARCHAR(64) PRIMARY KEY,
+        user_id VARCHAR(64) NOT NULL,
+        type VARCHAR(64) NOT NULL DEFAULT 'info',
+        title VARCHAR(255) NOT NULL,
+        message TEXT,
+        link VARCHAR(255),
+        entity_type VARCHAR(64),
+        entity_id VARCHAR(64),
+        actor_id VARCHAR(64),
+        is_read TINYINT(1) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_notifications_user (user_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
     // Ensure extended profile columns exist
     await addColumnIfNotExist(connection, "profiles", "designation", "VARCHAR(255)");
     await addColumnIfNotExist(connection, "profiles", "area", "VARCHAR(255)");

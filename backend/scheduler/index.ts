@@ -1,5 +1,6 @@
 import { logger } from "../utils/logger";
 import { pool } from "../db";
+import { OffersModel } from "../models/offers.model";
 
 class BackgroundScheduler {
   private timer: NodeJS.Timeout | null = null;
@@ -34,6 +35,10 @@ class BackgroundScheduler {
         "UPDATE sprints SET status = 'completed' WHERE end_date < ? AND status = 'active'",
         [today],
       );
+
+      // Job 3: Release scheduled offers whose send time has arrived
+      const released = await OffersModel.releaseDueScheduled();
+      if (released > 0) logger.info(`Dispatched ${released} scheduled offer(s)`);
 
       logger.info("Scheduled background tasks executed successfully");
     } catch (err) {

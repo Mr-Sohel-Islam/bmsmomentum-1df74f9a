@@ -86,9 +86,8 @@ export function NotificationCenter() {
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ["notifications", userId],
     enabled: Boolean(userId),
-    queryFn: async () => {
-      return [] as NotificationItem[];
-    },
+    queryFn: () => apiClient.get<NotificationItem[]>("/notifications"),
+    refetchInterval: 20000,
   });
 
   // Seed the "already seen" set so the first load never plays a burst of sounds.
@@ -116,21 +115,40 @@ export function NotificationCenter() {
   );
 
   async function markAllRead() {
+    try {
+      await apiClient.post("/notifications/read-all", {});
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
     refetch();
   }
 
   async function clearAll() {
-    toast.success("Notifications cleared");
+    try {
+      await apiClient.delete("/notifications");
+      toast.success("Notifications cleared");
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
     refetch();
   }
 
   async function toggleRead(n: NotificationItem, e: React.MouseEvent) {
     e.stopPropagation();
+    try {
+      await apiClient.put(`/notifications/${n.id}`, { read: !n.read });
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
     refetch();
   }
 
   async function open(n: NotificationItem) {
     setIsOpen(false);
+    if (!n.read) {
+      await apiClient.put(`/notifications/${n.id}`, { read: true }).catch(() => undefined);
+      refetch();
+    }
     if (n.link) navigate({ to: n.link });
   }
 

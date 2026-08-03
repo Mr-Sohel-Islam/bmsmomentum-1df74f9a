@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { MessageSquareHeart, Send, Trophy } from "lucide-react";
+import { Gift, MessageSquareHeart, Send, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { OffersSection } from "@/components/offers-manager";
 import { listAppreciations, sendAppreciation, leaderboard } from "@/lib/performance.functions";
 import { listUsers } from "@/lib/admin.functions";
 
@@ -69,7 +71,17 @@ function AppreciationPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <Tabs defaultValue="kudos" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="kudos" className="gap-1.5">
+            <MessageSquareHeart className="h-4 w-4" /> Kudos
+          </TabsTrigger>
+          <TabsTrigger value="offers" className="gap-1.5">
+            <Gift className="h-4 w-4" /> Offers
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="kudos" className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <SendForm users={(users ?? []).filter((u: { id: string }) => u.id !== me)} />
 
@@ -118,7 +130,12 @@ function AppreciationPage() {
             ))}
           </div>
         </div>
-      </div>
+        </TabsContent>
+
+        <TabsContent value="offers">
+          <OffersSection />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
