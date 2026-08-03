@@ -10,12 +10,12 @@ function userId(req: Request): string {
 
 export class OffersController {
   static async list(req: Request, res: Response) {
-    const offers = await OffersModel.list(req.query.status as string | undefined);
+    const offers = await OffersModel.list((req.query.status as string) || undefined);
     return sendSuccess(res, offers);
   }
 
   static async get(req: Request, res: Response) {
-    const offer = await OffersModel.findById(req.params.id);
+    const offer = await OffersModel.findById(String(req.params.id));
     if (!offer) throw new AppError("Offer not found", 404);
     const recipients = await OffersModel.listRecipients(offer.id);
     return sendSuccess(res, { ...offer, recipients });
@@ -28,19 +28,19 @@ export class OffersController {
   }
 
   static async update(req: Request, res: Response) {
-    const offer = await OffersModel.update(req.params.id, req.body || {});
+    const offer = await OffersModel.update(String(req.params.id), req.body || {});
     if (!offer) throw new AppError("Offer not found", 404);
     return sendSuccess(res, offer, "Offer updated");
   }
 
   static async remove(req: Request, res: Response) {
-    const ok = await OffersModel.remove(req.params.id);
+    const ok = await OffersModel.remove(String(req.params.id));
     if (!ok) throw new AppError("Offer not found", 404);
-    return sendSuccess(res, { id: req.params.id }, "Offer deleted");
+    return sendSuccess(res, { id: String(req.params.id) }, "Offer deleted");
   }
 
   static async recipients(req: Request, res: Response) {
-    return sendSuccess(res, await OffersModel.listRecipients(req.params.id));
+    return sendSuccess(res, await OffersModel.listRecipients(String(req.params.id)));
   }
 
   static async allRecipients(_req: Request, res: Response) {
@@ -56,7 +56,7 @@ export class OffersController {
     );
     if (invalid) throw new AppError("Outside recipients need an email address", 400);
 
-    const result = await OffersModel.addRecipients(req.params.id, recipients, userId(req), {
+    const result = await OffersModel.addRecipients(String(req.params.id), recipients, userId(req), {
       deliver: req.body?.schedule !== true,
     });
     return sendSuccess(
@@ -68,14 +68,14 @@ export class OffersController {
   }
 
   static async dispatchNow(req: Request, res: Response) {
-    const result = await OffersModel.dispatch(req.params.id);
+    const result = await OffersModel.dispatch(String(req.params.id));
     return sendSuccess(res, result, "Offer dispatched");
   }
 
   static async removeRecipient(req: Request, res: Response) {
-    const ok = await OffersModel.removeRecipient(req.params.recipientId);
+    const ok = await OffersModel.removeRecipient(String(req.params.recipientId));
     if (!ok) throw new AppError("Recipient not found", 404);
-    return sendSuccess(res, { id: req.params.recipientId }, "Recipient removed");
+    return sendSuccess(res, { id: String(req.params.recipientId) }, "Recipient removed");
   }
 }
 
@@ -85,8 +85,8 @@ export class NotificationsController {
   }
 
   static async markRead(req: Request, res: Response) {
-    await NotificationsModel.markRead(req.params.id, userId(req), req.body?.read !== false);
-    return sendSuccess(res, { id: req.params.id });
+    await NotificationsModel.markRead(String(req.params.id), userId(req), req.body?.read !== false);
+    return sendSuccess(res, { id: String(req.params.id) });
   }
 
   static async markAllRead(req: Request, res: Response) {
