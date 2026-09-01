@@ -39,19 +39,23 @@ const FIELD_OPERATIONS = [
   "detailing:read",
 ];
 const PERFORMANCE_READ = ["performance:read"];
+const OFFERS_READ = ["offers:read"];
+const OFFERS_MANAGE = ["offers:read", "offers:create", "offers:update", "offers:delete"];
+const OFFERS_SEND = ["offers:send", "offers:dispatch"];
+const OFFERS_FULL = [...OFFERS_MANAGE, ...OFFERS_SEND, "offers:logs"];
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   super_admin: ALL_PERMISSIONS,
   admin: ALL_PERMISSIONS,
   director: ALL_PERMISSIONS,
   gm: ALL_PERMISSIONS,
-  rm: [...TASK_MANAGE, ...TEAM_READ, ...APPROVAL_ACTION, ...FIELD_OPERATIONS, "users:read"],
-  bm: [...TASK_MANAGE, ...TEAM_READ, ...APPROVAL_ACTION, ...FIELD_OPERATIONS],
-  sm: [...TASK_MANAGE, ...TEAM_READ, ...APPROVAL_ACTION, ...FIELD_OPERATIONS],
-  am: [...TASK_MANAGE, ...TEAM_READ, ...APPROVAL_ACTION, ...FIELD_OPERATIONS],
-  smr: [...TASK_READ, ...APPROVAL_CREATE, ...FIELD_OPERATIONS, ...PERFORMANCE_READ],
-  mr: [...TASK_READ, ...FIELD_OPERATIONS, ...PERFORMANCE_READ],
-  field_rep: [...TASK_READ, ...FIELD_OPERATIONS, ...PERFORMANCE_READ],
+  rm: [...TASK_MANAGE, ...TEAM_READ, ...APPROVAL_ACTION, ...FIELD_OPERATIONS, ...OFFERS_FULL, "users:read"],
+  bm: [...TASK_MANAGE, ...TEAM_READ, ...APPROVAL_ACTION, ...FIELD_OPERATIONS, ...OFFERS_FULL],
+  sm: [...TASK_MANAGE, ...TEAM_READ, ...APPROVAL_ACTION, ...FIELD_OPERATIONS, ...OFFERS_MANAGE, ...OFFERS_SEND],
+  am: [...TASK_MANAGE, ...TEAM_READ, ...APPROVAL_ACTION, ...FIELD_OPERATIONS, ...OFFERS_READ],
+  smr: [...TASK_READ, ...APPROVAL_CREATE, ...FIELD_OPERATIONS, ...PERFORMANCE_READ, ...OFFERS_READ],
+  mr: [...TASK_READ, ...FIELD_OPERATIONS, ...PERFORMANCE_READ, ...OFFERS_READ],
+  field_rep: [...TASK_READ, ...FIELD_OPERATIONS, ...PERFORMANCE_READ, ...OFFERS_READ],
   sales_rep: [
     ...TASK_WRITE,
     ...TEAM_READ,
@@ -88,6 +92,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     ...FIELD_OPERATIONS,
     ...PERFORMANCE_READ,
     "performance:evaluate",
+    ...OFFERS_FULL,
     "users:read",
   ],
   developer: [
@@ -97,7 +102,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     ...APPROVAL_CREATE,
     ...PERFORMANCE_READ,
   ],
-  viewer: [...TASK_READ, ...TEAM_READ, ...APPROVAL_READ, ...PERFORMANCE_READ, "users:read"],
+  viewer: [...TASK_READ, ...TEAM_READ, ...APPROVAL_READ, ...PERFORMANCE_READ, ...OFFERS_READ, "users:read"],
   guest: TASK_READ,
 };
 

@@ -36,9 +36,10 @@ class BackgroundScheduler {
         [today],
       );
 
-      // Job 3: Release scheduled offers whose send time has arrived
-      const released = await OffersModel.releaseDueScheduled();
-      if (released > 0) logger.info(`Dispatched ${released} scheduled offer(s)`);
+      // Job 3: Release scheduled offers and retry failed deliveries
+      const { dispatched, retried } = await OffersModel.releaseDueScheduled();
+      if (dispatched > 0) logger.info(`Dispatched ${dispatched} scheduled offer(s)`);
+      if (retried > 0) logger.info(`Retried ${retried} offer delivery attempt(s)`);
 
       logger.info("Scheduled background tasks executed successfully");
     } catch (err) {
