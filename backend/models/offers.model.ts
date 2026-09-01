@@ -33,6 +33,9 @@ export interface Offer {
   sent_count?: number;
 }
 
+export const MAX_DELIVERY_ATTEMPTS = 3;
+export const RETRY_BACKOFF_MINUTES = [2, 10, 60];
+
 export interface OfferRecipient {
   id: string;
   offer_id: string;
@@ -44,10 +47,22 @@ export interface OfferRecipient {
   delivery_status: DeliveryStatus;
   error_message: string | null;
   sent_at: string | null;
+  attempt_count?: number | null;
+  last_attempt_at?: string | null;
+  next_attempt_at?: string | null;
   created_by: string;
   created_at?: string;
   offer_title?: string;
   promo_code?: string | null;
+}
+
+export interface DispatchResult {
+  offer_id: string;
+  attempted: number;
+  sent: number;
+  failed: number;
+  retrying: number;
+  recipients: OfferRecipient[];
 }
 
 const OFFER_SELECT = `
