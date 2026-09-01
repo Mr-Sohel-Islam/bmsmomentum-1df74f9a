@@ -39,6 +39,10 @@ const FIELD_OPERATIONS = [
   "detailing:read",
 ];
 const PERFORMANCE_READ = ["performance:read"];
+const OFFERS_READ = ["offers:read"];
+const OFFERS_MANAGE = ["offers:read", "offers:create", "offers:update", "offers:delete"];
+const OFFERS_SEND = ["offers:send", "offers:dispatch"];
+const OFFERS_FULL = [...OFFERS_MANAGE, ...OFFERS_SEND, "offers:logs"];
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   super_admin: ALL_PERMISSIONS,
