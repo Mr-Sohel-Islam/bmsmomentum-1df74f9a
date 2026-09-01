@@ -1355,7 +1355,6 @@ export async function initDb() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // Ensure extended profile columns exist
     // Offer delivery retry bookkeeping
     await addColumnIfNotExist(connection, "offer_recipients", "attempt_count", "INT DEFAULT 0");
     await addColumnIfNotExist(connection, "offer_recipients", "last_attempt_at", "DATETIME");
