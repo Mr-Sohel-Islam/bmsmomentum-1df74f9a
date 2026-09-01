@@ -245,68 +245,157 @@ export class OffersModel {
     return res.affectedRows > 0;
   }
 
-  /** Deliver every pending/scheduled recipient of an offer. */
-  static async dispatch(offerId: string): Promise<OfferRecipient[]> {
-    const offer = await this.findById(offerId);
-    if (!offer) throw new Error("Offer not found");
+  /** Deliver one recipient. Throws with a readable message on failure. */
+  private static async deliverOne(offer: Offer, raw: OfferRecipient) {
+    const wantsEmail = raw.channel !== "notification";
+    const wantsNotification =
+      raw.recipient_type === "employee" && Boolean(raw.recipient_id) && raw.channel !== "email";
 
-    const [rows] = await pool.query<mysql.RowDataPacket[]>(
-      "SELECT * FROM offer_recipients WHERE offer_id = ? AND delivery_status IN ('pending','scheduled','failed')",
-      [offerId],
-    );
-
-    for (const raw of rows as OfferRecipient[]) {
-      try {
-        const subject = offer.email_subject || `New offer: ${offer.title}`;
-        const html = renderOfferEmail(offer, raw);
-
-        if (raw.channel !== "notification" && raw.recipient_email) {
-          await sendEmail({ to: raw.recipient_email, subject, html });
-        }
-
-        if (raw.recipient_type === "employee" && raw.recipient_id && raw.channel !== "email") {
-          await NotificationsModel.create({
-            user_id: raw.recipient_id,
-            type: "offer",
-            title: `New offer: ${offer.title}`,
-            message: offer.promo_code
-              ? `${offer.description || "An offer has been shared with you."} (Promo code: ${offer.promo_code})`
-              : offer.description || "An offer has been shared with you.",
-            link: "/appreciation",
-            entity_type: "offer",
-            entity_id: offer.id,
-            actor_id: offer.created_by,
-          });
-        }
-
-        await pool.query(
-          "UPDATE offer_recipients SET delivery_status = 'sent', sent_at = NOW(), error_message = NULL WHERE id = ?",
-          [raw.id],
-        );
-      } catch (err) {
-        await pool.query(
-          "UPDATE offer_recipients SET delivery_status = 'failed', error_message = ? WHERE id = ?",
-          [String(err).slice(0, 480), raw.id],
-        );
+    if (wantsEmail && !raw.recipient_email) {
+      if (!wantsNotification) {
+        throw new Error("No email address on file for this recipient");
       }
     }
 
-    if (offer.status === "scheduled" || offer.status === "draft") {
+    if (wantsEmail && raw.recipient_email) {
+      await sendEmail({
+        to: raw.recipient_email,
+        subject: offer.email_subject || `New offer: ${offer.title}`,
+        html: renderOfferEmail(offer, raw),
+      });
+    }
+
+    if (wantsNotification) {
+      await NotificationsModel.create({
+        user_id: raw.recipient_id!,
+        type: "offer",
+        title: `New offer: ${offer.title}`,
+        message: offer.promo_code
+          ? `${offer.description || "An offer has been shared with you."} (Promo code: ${offer.promo_code})`
+          : offer.description || "An offer has been shared with you.",
+        link: "/appreciation",
+        entity_type: "offer",
+        entity_id: offer.id,
+        actor_id: offer.created_by,
+      });
+    }
+  }
+
+  /**
+   * Deliver every pending / scheduled recipient of an offer, plus any failed
+   * recipient whose retry backoff has elapsed. Failures never throw: each
+   * recipient records its own attempt count, error and next retry time.
+   */
+  static async dispatch(
+    offerId: string,
+    options: { includeRetries?: boolean } = {},
+  ): Promise<DispatchResult> {
+    const offer = await this.findById(offerId);
+    if (!offer) throw new Error("Offer not found");
+
+    const includeRetries = options.includeRetries ?? true;
+    const [rows] = await pool.query<mysql.RowDataPacket[]>(
+      `SELECT * FROM offer_recipients
+        WHERE offer_id = ?
+          AND (
+            delivery_status IN ('pending','scheduled')
+            OR (? = 1 AND delivery_status = 'failed'
+                AND COALESCE(attempt_count, 0) < ?
+                AND (next_attempt_at IS NULL OR next_attempt_at <= NOW()))
+          )`,
+      [offerId, includeRetries ? 1 : 0, MAX_DELIVERY_ATTEMPTS],
+    );
+
+    let sent = 0;
+    let failed = 0;
+    let retrying = 0;
+    let lastError: string | null = null;
+
+    for (const raw of rows as OfferRecipient[]) {
+      const attempt = Number(raw.attempt_count ?? 0) + 1;
+      try {
+        await this.deliverOne(offer, raw);
+        await pool.query(
+          `UPDATE offer_recipients
+             SET delivery_status = 'sent', sent_at = NOW(), error_message = NULL,
+                 attempt_count = ?, last_attempt_at = NOW(), next_attempt_at = NULL
+           WHERE id = ?`,
+          [attempt, raw.id],
+        );
+        sent += 1;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        lastError = message;
+        const exhausted = attempt >= MAX_DELIVERY_ATTEMPTS;
+        const backoff = RETRY_BACKOFF_MINUTES[Math.min(attempt - 1, RETRY_BACKOFF_MINUTES.length - 1)];
+        await pool.query(
+          `UPDATE offer_recipients
+             SET delivery_status = 'failed', error_message = ?, attempt_count = ?,
+                 last_attempt_at = NOW(),
+                 next_attempt_at = ${exhausted ? "NULL" : "DATE_ADD(NOW(), INTERVAL ? MINUTE)"}
+           WHERE id = ?`,
+          exhausted
+            ? [`Gave up after ${attempt} attempt(s): ${message}`.slice(0, 480), attempt, raw.id]
+            : [
+                `Attempt ${attempt} failed: ${message}`.slice(0, 480),
+                attempt,
+                backoff,
+                raw.id,
+              ],
+        );
+        if (exhausted) failed += 1;
+        else retrying += 1;
+      }
+    }
+
+    await pool.query("UPDATE offers SET last_dispatched_at = NOW(), last_dispatch_error = ? WHERE id = ?", [
+      lastError ? lastError.slice(0, 480) : null,
+      offerId,
+    ]);
+
+    if (sent > 0 && (offer.status === "scheduled" || offer.status === "draft")) {
       await pool.query("UPDATE offers SET status = 'active' WHERE id = ?", [offerId]);
     }
 
-    return this.listRecipients(offerId);
+    return {
+      offer_id: offerId,
+      attempted: rows.length,
+      sent,
+      failed,
+      retrying,
+      recipients: await this.listRecipients(offerId),
+    };
   }
 
-  /** Called by the background scheduler: release offers whose time has come. */
-  static async releaseDueScheduled(): Promise<number> {
-    const [rows] = await pool.query<mysql.RowDataPacket[]>(
+  /**
+   * Called by the background scheduler: release offers whose time has come and
+   * retry any delivery still eligible for another attempt.
+   */
+  static async releaseDueScheduled(): Promise<{ dispatched: number; retried: number }> {
+    const [due] = await pool.query<mysql.RowDataPacket[]>(
       "SELECT id FROM offers WHERE status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= NOW()",
     );
-    for (const row of rows) {
+    for (const row of due) {
       await this.dispatch(row.id as string);
     }
-    return rows.length;
+
+    const [retryable] = await pool.query<mysql.RowDataPacket[]>(
+      `SELECT DISTINCT offer_id FROM offer_recipients
+        WHERE delivery_status = 'failed'
+          AND COALESCE(attempt_count, 0) < ?
+          AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())`,
+      [MAX_DELIVERY_ATTEMPTS],
+    );
+    const dueIds = new Set(due.map((r) => String(r.id)));
+    let retried = 0;
+    for (const row of retryable) {
+      const id = String(row.offer_id);
+      if (dueIds.has(id)) continue;
+      const result = await this.dispatch(id);
+      retried += result.attempted;
+    }
+
+    return { dispatched: due.length, retried };
   }
 }
 
