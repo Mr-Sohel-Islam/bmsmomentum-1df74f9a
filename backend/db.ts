@@ -1356,6 +1356,14 @@ export async function initDb() {
     `);
 
     // Ensure extended profile columns exist
+    // Offer delivery retry bookkeeping
+    await addColumnIfNotExist(connection, "offer_recipients", "attempt_count", "INT DEFAULT 0");
+    await addColumnIfNotExist(connection, "offer_recipients", "last_attempt_at", "DATETIME");
+    await addColumnIfNotExist(connection, "offer_recipients", "next_attempt_at", "DATETIME");
+    await addColumnIfNotExist(connection, "offers", "last_dispatched_at", "DATETIME");
+    await addColumnIfNotExist(connection, "offers", "last_dispatch_error", "TEXT");
+
+    // Ensure extended profile columns exist
     await addColumnIfNotExist(connection, "profiles", "designation", "VARCHAR(255)");
     await addColumnIfNotExist(connection, "profiles", "area", "VARCHAR(255)");
     await addColumnIfNotExist(connection, "profiles", "office_number", "VARCHAR(50)");
